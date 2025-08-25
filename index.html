@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Todo - Learning Tracker</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1><i class="fas fa-tasks"></i> Smart Todo</h1>
+                <div class="header-actions">
+                    <button id="theme-toggle" class="theme-toggle">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                    <button id="export-btn" class="export-btn">
+                        <i class="fas fa-download"></i> Export
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <nav class="nav-tabs">
+            <button class="tab-btn active" data-tab="todos">
+                <i class="fas fa-list-check"></i> Todos
+            </button>
+            <button class="tab-btn" data-tab="learning">
+                <i class="fas fa-graduation-cap"></i> Learning
+            </button>
+            <button class="tab-btn" data-tab="progress">
+                <i class="fas fa-chart-line"></i> Progress
+            </button>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Todos Tab -->
+            <div id="todos-tab" class="tab-content active">
+                <div class="todo-section">
+                    <div class="section-header">
+                        <h2>My Tasks</h2>
+                        <button id="add-todo-btn" class="add-btn">
+                            <i class="fas fa-plus"></i> Add Task
+                        </button>
+                    </div>
+                    
+                    <div class="todo-filters">
+                        <button class="filter-btn active" data-filter="all">All</button>
+                        <button class="filter-btn" data-filter="pending">Pending</button>
+                        <button class="filter-btn" data-filter="completed">Completed</button>
+                        <button class="filter-btn" data-filter="priority">Priority</button>
+                    </div>
+
+                    <div id="todo-list" class="todo-list">
+                        <!-- Todos will be dynamically added here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Learning Tab -->
+            <div id="learning-tab" class="tab-content">
+                <div class="learning-section">
+                    <div class="section-header">
+                        <h2>Daily Learning Checklist</h2>
+                        <button id="add-learning-btn" class="add-btn">
+                            <i class="fas fa-plus"></i> Add Learning Item
+                        </button>
+                    </div>
+
+                    <div class="learning-stats">
+                        <div class="stat-card">
+                            <div class="stat-number" id="today-completed">0</div>
+                            <div class="stat-label">Today Completed</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="week-completed">0</div>
+                            <div class="stat-label">This Week</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="streak-days">0</div>
+                            <div class="stat-label">Day Streak</div>
+                        </div>
+                    </div>
+
+                    <div id="learning-list" class="learning-list">
+                        <!-- Learning items will be dynamically added here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Progress Tab -->
+            <div id="progress-tab" class="tab-content">
+                <div class="progress-section">
+                    <div class="section-header">
+                        <h2>Weekly Progress</h2>
+                        <div class="date-selector">
+                            <button id="prev-week" class="date-nav-btn">
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <span id="current-week">This Week</span>
+                            <button id="next-week" class="date-nav-btn">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="progress-charts">
+                        <div class="chart-container">
+                            <h3>Daily Completion</h3>
+                            <div id="daily-chart" class="chart"></div>
+                        </div>
+                        <div class="chart-container">
+                            <h3>Learning Categories</h3>
+                            <div id="category-chart" class="chart"></div>
+                        </div>
+                    </div>
+
+                    <div class="progress-summary">
+                        <div class="summary-card">
+                            <h3>Weekly Summary</h3>
+                            <div id="weekly-summary" class="summary-content">
+                                <!-- Summary will be dynamically added here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="todo-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="todo-modal-title">Add New Task</h3>
+                <button class="close-btn" id="close-todo-modal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="todo-form">
+                <div class="form-group">
+                    <label for="todo-title">Title</label>
+                    <input type="text" id="todo-title" required>
+                </div>
+                <div class="form-group">
+                    <label for="todo-description">Description</label>
+                    <textarea id="todo-description" rows="3"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="todo-priority">Priority</label>
+                        <select id="todo-priority">
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="todo-due-date">Due Date</label>
+                        <input type="date" id="todo-due-date">
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" id="cancel-todo">Cancel</button>
+                    <button type="submit" class="btn-primary">Save Task</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="learning-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="learning-modal-title">Add Learning Item</h3>
+                <button class="close-btn" id="close-learning-modal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="learning-form">
+                <div class="form-group">
+                    <label for="learning-title">Learning Topic</label>
+                    <input type="text" id="learning-title" required>
+                </div>
+                <div class="form-group">
+                    <label for="learning-category">Category</label>
+                    <select id="learning-category">
+                        <option value="programming">Programming</option>
+                        <option value="design">Design</option>
+                        <option value="business">Business</option>
+                        <option value="language">Language</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="learning-notes">Notes/Comments</label>
+                    <textarea id="learning-notes" rows="4" placeholder="Add your learning notes, resources, or comments..."></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" id="cancel-learning">Cancel</button>
+                    <button type="submit" class="btn-primary">Save Learning Item</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
