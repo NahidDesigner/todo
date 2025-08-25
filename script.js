@@ -1,24 +1,24 @@
-// Smart Todo App - Main JavaScript File
+// Smart Todo App - Main JavaScript File with Firebase Integration
 
 class SmartTodoApp {
     constructor() {
-        this.todos = JSON.parse(localStorage.getItem('smartTodo_todos')) || [];
-        this.learningItems = JSON.parse(localStorage.getItem('smartTodo_learning')) || [];
+        this.todos = [];
+        this.learningItems = [];
         this.currentFilter = 'all';
         this.currentWeek = new Date();
         this.editingTodoId = null;
         this.editingLearningId = null;
+        this.currentUser = null;
+        this.isOnline = navigator.onLine;
         
         this.init();
     }
 
-    init() {
+    async init() {
         this.setupEventListeners();
         this.loadTheme();
-        this.renderTodos();
-        this.renderLearningItems();
-        this.updateStats();
-        this.renderProgress();
+        this.setupFirebaseAuth();
+        this.setupOnlineStatus();
         this.setupSampleData();
     }
 
@@ -27,6 +27,14 @@ class SmartTodoApp {
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', (e) => this.switchTab(e.target.dataset.tab));
         });
+
+        // Auth events
+        document.getElementById('auth-btn').addEventListener('click', () => this.openAuthModal());
+        document.getElementById('close-auth-modal').addEventListener('click', () => this.closeAuthModal());
+        document.getElementById('switch-to-signup').addEventListener('click', () => this.switchAuthForm('signup'));
+        document.getElementById('switch-to-signin').addEventListener('click', () => this.switchAuthForm('signin'));
+        document.getElementById('signin-btn').addEventListener('click', () => this.signIn());
+        document.getElementById('signup-btn').addEventListener('click', () => this.signUp());
 
         // Todo events
         document.getElementById('add-todo-btn').addEventListener('click', () => this.openTodoModal());
@@ -62,6 +70,351 @@ class SmartTodoApp {
         document.getElementById('learning-modal').addEventListener('click', (e) => {
             if (e.target.id === 'learning-modal') this.closeLearningModal();
         });
+        document.getElementById('auth-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'auth-modal') this.closeAuthModal();
+        });
+
+        // Online/offline status
+        window.addEventListener('online', () => this.handleOnlineStatus(true));
+        window.addEventListener('offline', () => this.handleOnlineStatus(false));
+    }
+
+    // Firebase Authentication
+    setupFirebaseAuth() {
+        auth.onAuthStateChanged(async (user) => {
+            this.currentUser = user;
+            this.updateAuthUI();
+            
+            if (user) {
+                console.log('User signed in:', user.email);
+                await this.loadUserData();
+                this.setupRealtimeListeners();
+            } else {
+                console.log('User signed out');
+                this.todos = [];
+                this.learningItems = [];
+                this.renderTodos();
+                this.renderLearningItems();
+                this.updateStats();
+            }
+        });
+    }
+
+    updateAuthUI() {
+        const authBtn = document.getElementById('auth-btn');
+        const userEmail = document.getElementById('user-email');
+        
+        if (this.currentUser) {
+            authBtn.innerHTML = '<i class="fas fa-sign-out-alt"></i> Sign Out';
+            authBtn.className = 'auth-btn';
+            authBtn.onclick = () => this.signOut();
+            userEmail.textContent = this.currentUser.email;
+            userEmail.style.display = 'block';
+        } else {
+            authBtn.innerHTML = '<i class="fas fa-user"></i> Sign In';
+            authBtn.className = 'auth-btn signed-out';
+            authBtn.onclick = () => this.openAuthModal();
+            userEmail.style.display = 'none';
+        }
+    }
+
+    openAuthModal() {
+        document.getElementById('auth-modal').classList.add('active');
+        this.switchAuthForm('signin');
+    }
+
+    closeAuthModal() {
+        document.getElementById('auth-modal').classList.remove('active');
+        // Clear form fields
+        document.getElementById('signin-email').value = '';
+        document.getElementById('signin-password').value = '';
+        document.getElementById('signup-email').value = '';
+        document.getElementById('signup-password').value = '';
+        document.getElementById('signup-confirm-password').value = '';
+    }
+
+    switchAuthForm(formType) {
+        const signinForm = document.getElementById('signin-form');
+        const signupForm = document.getElementById('signup-form');
+        const modalTitle = document.getElementById('auth-modal-title');
+        
+        if (formType === 'signup') {
+            signinForm.style.display = 'none';
+            signupForm.style.display = 'block';
+            modalTitle.textContent = 'Create Account';
+        } else {
+            signinForm.style.display = 'block';
+            signupForm.style.display = 'none';
+            modalTitle.textContent = 'Sign In';
+        }
+    }
+
+    async signIn() {
+        const email = document.getElementById('signin-email').value;
+        const password = document.getElementById('signin-password').value;
+        
+        try {
+            await auth.signInWithEmailAndPassword(email, password);
+            this.closeAuthModal();
+            this.showNotification('Signed in successfully!', 'success');
+        } catch (error) {
+            this.showNotification(error.message, 'error');
+        }
+    }
+
+    async signUp() {
+        const email = document.getElementById('signup-email').value;
+        const password = document.getElementById('signup-password').value;
+        const confirmPassword = document.getElementById('signup-confirm-password').value;
+        
+        if (password !== confirmPassword) {
+            this.showNotification('Passwords do not match!', 'error');
+            return;
+        }
+        
+        try {
+            await auth.createUserWithEmailAndPassword(email, password);
+            this.closeAuthModal();
+            this.showNotification('Account created successfully!', 'success');
+        } catch (error) {
+            this.showNotification(error.message, 'error');
+        }
+    }
+
+    async signOut() {
+        try {
+            await auth.signOut();
+            this.showNotification('Signed out successfully!', 'success');
+        } catch (error) {
+            this.showNotification(error.message, 'error');
+        }
+    }
+
+    // Firebase Data Management
+    async loadUserData() {
+        if (!this.currentUser) return;
+        
+        try {
+            // Load todos
+            const todosSnapshot = await db.collection('users').doc(this.currentUser.uid)
+                .collection('todos').get();
+            
+            this.todos = todosSnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            
+            // Load learning items
+            const learningSnapshot = await db.collection('users').doc(this.currentUser.uid)
+                .collection('learning').get();
+            
+            this.learningItems = learningSnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            
+            this.renderTodos();
+            this.renderLearningItems();
+            this.updateStats();
+            this.renderProgress();
+            
+        } catch (error) {
+            console.error('Error loading user data:', error);
+            this.showNotification('Error loading data. Using local storage as backup.', 'warning');
+            this.loadLocalData();
+        }
+    }
+
+    setupRealtimeListeners() {
+        if (!this.currentUser) return;
+        
+        // Real-time todos listener
+        db.collection('users').doc(this.currentUser.uid)
+            .collection('todos')
+            .onSnapshot((snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    if (change.type === 'added' || change.type === 'modified') {
+                        const todo = { id: change.doc.id, ...change.doc.data() };
+                        const index = this.todos.findIndex(t => t.id === todo.id);
+                        if (index !== -1) {
+                            this.todos[index] = todo;
+                        } else {
+                            this.todos.push(todo);
+                        }
+                    } else if (change.type === 'removed') {
+                        this.todos = this.todos.filter(t => t.id !== change.doc.id);
+                    }
+                });
+                this.renderTodos();
+                this.updateStats();
+            });
+        
+        // Real-time learning listener
+        db.collection('users').doc(this.currentUser.uid)
+            .collection('learning')
+            .onSnapshot((snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    if (change.type === 'added' || change.type === 'modified') {
+                        const learning = { id: change.doc.id, ...change.doc.data() };
+                        const index = this.learningItems.findIndex(l => l.id === learning.id);
+                        if (index !== -1) {
+                            this.learningItems[index] = learning;
+                        } else {
+                            this.learningItems.push(learning);
+                        }
+                    } else if (change.type === 'removed') {
+                        this.learningItems = this.learningItems.filter(l => l.id !== change.doc.id);
+                    }
+                });
+                this.renderLearningItems();
+                this.updateStats();
+            });
+    }
+
+    async saveTodo(todo) {
+        if (!this.currentUser) {
+            this.saveLocalTodos();
+            return;
+        }
+        
+        try {
+            if (todo.id) {
+                // Update existing todo
+                await db.collection('users').doc(this.currentUser.uid)
+                    .collection('todos').doc(todo.id).set(todo);
+            } else {
+                // Add new todo
+                const docRef = await db.collection('users').doc(this.currentUser.uid)
+                    .collection('todos').add(todo);
+                todo.id = docRef.id;
+            }
+        } catch (error) {
+            console.error('Error saving todo:', error);
+            this.showNotification('Error saving to cloud. Using local storage.', 'warning');
+            this.saveLocalTodos();
+        }
+    }
+
+    async saveLearningItem(learning) {
+        if (!this.currentUser) {
+            this.saveLocalLearningItems();
+            return;
+        }
+        
+        try {
+            if (learning.id) {
+                // Update existing learning item
+                await db.collection('users').doc(this.currentUser.uid)
+                    .collection('learning').doc(learning.id).set(learning);
+            } else {
+                // Add new learning item
+                const docRef = await db.collection('users').doc(this.currentUser.uid)
+                    .collection('learning').add(learning);
+                learning.id = docRef.id;
+            }
+        } catch (error) {
+            console.error('Error saving learning item:', error);
+            this.showNotification('Error saving to cloud. Using local storage.', 'warning');
+            this.saveLocalLearningItems();
+        }
+    }
+
+    async deleteTodo(todoId) {
+        if (!this.currentUser) {
+            this.todos = this.todos.filter(t => t.id !== todoId);
+            this.saveLocalTodos();
+            this.renderTodos();
+            this.updateStats();
+            return;
+        }
+        
+        try {
+            await db.collection('users').doc(this.currentUser.uid)
+                .collection('todos').doc(todoId).delete();
+        } catch (error) {
+            console.error('Error deleting todo:', error);
+            this.showNotification('Error deleting from cloud. Using local storage.', 'warning');
+            this.todos = this.todos.filter(t => t.id !== todoId);
+            this.saveLocalTodos();
+            this.renderTodos();
+            this.updateStats();
+        }
+    }
+
+    // Local Storage Backup
+    loadLocalData() {
+        this.todos = JSON.parse(localStorage.getItem('smartTodo_todos')) || [];
+        this.learningItems = JSON.parse(localStorage.getItem('smartTodo_learning')) || [];
+    }
+
+    saveLocalTodos() {
+        localStorage.setItem('smartTodo_todos', JSON.stringify(this.todos));
+    }
+
+    saveLocalLearningItems() {
+        localStorage.setItem('smartTodo_learning', JSON.stringify(this.learningItems));
+    }
+
+    // Online Status Management
+    setupOnlineStatus() {
+        this.updateOnlineStatus();
+    }
+
+    handleOnlineStatus(isOnline) {
+        this.isOnline = isOnline;
+        this.updateOnlineStatus();
+        
+        if (isOnline && this.currentUser) {
+            this.showNotification('Back online! Syncing data...', 'success');
+            this.loadUserData();
+        } else if (!isOnline) {
+            this.showNotification('You are offline. Changes will be saved locally.', 'warning');
+        }
+    }
+
+    updateOnlineStatus() {
+        const statusIndicator = document.createElement('div');
+        statusIndicator.className = `online-status ${this.isOnline ? 'online' : 'offline'}`;
+        statusIndicator.innerHTML = `<i class="fas fa-${this.isOnline ? 'wifi' : 'wifi-slash'}"></i>`;
+        statusIndicator.title = this.isOnline ? 'Online' : 'Offline';
+        
+        // Remove existing indicator
+        const existing = document.querySelector('.online-status');
+        if (existing) existing.remove();
+        
+        // Add new indicator
+        document.querySelector('.header-actions').prepend(statusIndicator);
+    }
+
+    // Notification System
+    showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `notification notification-${type}`;
+        notification.innerHTML = `
+            <i class="fas fa-${this.getNotificationIcon(type)}"></i>
+            <span>${message}</span>
+            <button onclick="this.parentElement.remove()">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Auto remove after 5 seconds
+        setTimeout(() => {
+            if (notification.parentElement) {
+                notification.remove();
+            }
+        }, 5000);
+    }
+
+    getNotificationIcon(type) {
+        switch (type) {
+            case 'success': return 'check-circle';
+            case 'error': return 'exclamation-circle';
+            case 'warning': return 'exclamation-triangle';
+            default: return 'info-circle';
+        }
     }
 
     // Tab Management
@@ -117,7 +470,7 @@ class SmartTodoApp {
         this.editingTodoId = null;
     }
 
-    handleTodoSubmit(e) {
+    async handleTodoSubmit(e) {
         e.preventDefault();
         
         const formData = new FormData(e.target);
@@ -135,14 +488,15 @@ class SmartTodoApp {
             const index = this.todos.findIndex(t => t.id === this.editingTodoId);
             if (index !== -1) {
                 this.todos[index] = { ...this.todos[index], ...todoData };
+                await this.saveTodo(this.todos[index]);
             }
         } else {
             // Add new todo
             todoData.id = this.generateId();
             this.todos.push(todoData);
+            await this.saveTodo(todoData);
         }
 
-        this.saveTodos();
         this.renderTodos();
         this.closeTodoModal();
         this.updateStats();
@@ -231,7 +585,7 @@ class SmartTodoApp {
         this.renderTodos();
     }
 
-    toggleTodo(todoId) {
+    async toggleTodo(todoId) {
         const todo = this.todos.find(t => t.id === todoId);
         if (todo) {
             todo.completed = !todo.completed;
@@ -240,16 +594,7 @@ class SmartTodoApp {
             } else {
                 delete todo.completedAt;
             }
-            this.saveTodos();
-            this.renderTodos();
-            this.updateStats();
-        }
-    }
-
-    deleteTodo(todoId) {
-        if (confirm('Are you sure you want to delete this task?')) {
-            this.todos = this.todos.filter(t => t.id !== todoId);
-            this.saveTodos();
+            await this.saveTodo(todo);
             this.renderTodos();
             this.updateStats();
         }
@@ -286,7 +631,7 @@ class SmartTodoApp {
         this.editingLearningId = null;
     }
 
-    handleLearningSubmit(e) {
+    async handleLearningSubmit(e) {
         e.preventDefault();
         
         const formData = new FormData(e.target);
@@ -303,14 +648,15 @@ class SmartTodoApp {
             const index = this.learningItems.findIndex(l => l.id === this.editingLearningId);
             if (index !== -1) {
                 this.learningItems[index] = { ...this.learningItems[index], ...learningData };
+                await this.saveLearningItem(this.learningItems[index]);
             }
         } else {
             // Add new learning item
             learningData.id = this.generateId();
             this.learningItems.push(learningData);
+            await this.saveLearningItem(learningData);
         }
 
-        this.saveLearningItems();
         this.renderLearningItems();
         this.closeLearningModal();
         this.updateStats();
@@ -342,7 +688,7 @@ class SmartTodoApp {
             }));
             
             this.learningItems.push(...todayItems);
-            this.saveLearningItems();
+            todayItems.forEach(item => this.saveLearningItem(item));
         }
 
         if (todayItems.length === 0) {
@@ -375,7 +721,7 @@ class SmartTodoApp {
         `).join('');
     }
 
-    toggleLearning(learningId) {
+    async toggleLearning(learningId) {
         const learning = this.learningItems.find(l => l.id === learningId);
         if (learning) {
             learning.completed = !learning.completed;
@@ -384,7 +730,7 @@ class SmartTodoApp {
             } else {
                 delete learning.completedAt;
             }
-            this.saveLearningItems();
+            await this.saveLearningItem(learning);
             this.renderLearningItems();
             this.updateStats();
         }
@@ -512,7 +858,6 @@ class SmartTodoApp {
         ).length;
         
         const totalItems = todosCompleted + learningCompleted;
-        const weekDays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
         
         let summaryHTML = `
             <p><strong>Week of ${this.formatDate(weekStart)}</strong></p>
@@ -653,21 +998,13 @@ class SmartTodoApp {
         icon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
     }
 
-    // Data Persistence
-    saveTodos() {
-        localStorage.setItem('smartTodo_todos', JSON.stringify(this.todos));
-    }
-
-    saveLearningItems() {
-        localStorage.setItem('smartTodo_learning', JSON.stringify(this.learningItems));
-    }
-
     // Export Functionality
     exportData() {
         const data = {
             todos: this.todos,
             learningItems: this.learningItems,
-            exportDate: new Date().toISOString()
+            exportDate: new Date().toISOString(),
+            user: this.currentUser ? this.currentUser.email : 'anonymous'
         };
         
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -679,11 +1016,13 @@ class SmartTodoApp {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+        
+        this.showNotification('Data exported successfully!', 'success');
     }
 
     // Sample Data Setup
     setupSampleData() {
-        if (this.todos.length === 0 && this.learningItems.length === 0) {
+        if (this.todos.length === 0 && this.learningItems.length === 0 && !this.currentUser) {
             // Add sample todos
             const sampleTodos = [
                 {
@@ -728,8 +1067,8 @@ class SmartTodoApp {
 
             this.todos.push(...sampleTodos);
             this.learningItems.push(...sampleLearning);
-            this.saveTodos();
-            this.saveLearningItems();
+            this.saveLocalTodos();
+            this.saveLocalLearningItems();
             this.renderTodos();
             this.renderLearningItems();
             this.updateStats();
