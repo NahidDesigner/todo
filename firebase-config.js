@@ -1,21 +1,23 @@
 // Firebase Configuration
-// Replace this with your own Firebase project configuration
+// Your actual Firebase project configuration
 
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.appspot.com",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
+    apiKey: "AIzaSyBjs7MeQuK-BlQT5cgtBRD7iqSd3sByrtk",
+    authDomain: "smart-todo-b419c.firebaseapp.com",
+    projectId: "smart-todo-b419c",
+    storageBucket: "smart-todo-b419c.firebasestorage.app",
+    messagingSenderId: "671151709526",
+    appId: "1:671151709526:web:51e7e1a5ed0856816e4af7",
+    measurementId: "G-9G2SLWPFC6"
 };
 
 // Initialize Firebase
-firebase.initializeApp(firebaseConfig);
+const app = firebase.initializeApp(firebaseConfig);
 
 // Initialize Firebase services
-const auth = firebase.auth();
-const db = firebase.firestore();
+const auth = firebase.auth(app);
+const db = firebase.firestore(app);
+const analytics = firebase.analytics(app);
 
 // Enable offline persistence
 db.enablePersistence()
