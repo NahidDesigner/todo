@@ -21,6 +21,20 @@
             <div class="header-content">
                 <h1><i class="fas fa-tasks"></i> Smart Todo</h1>
                 <div class="header-actions">
+                    <!-- Admin Panel Toggle -->
+                    <button id="admin-toggle" class="admin-toggle" style="display: none;">
+                        <i class="fas fa-crown"></i> Admin Panel
+                    </button>
+                    <!-- Notifications -->
+                    <div id="notifications-dropdown" class="notifications-dropdown" style="display: none;">
+                        <button id="notifications-btn" class="notifications-btn">
+                            <i class="fas fa-bell"></i>
+                            <span id="notification-count" class="notification-count">0</span>
+                        </button>
+                        <div id="notifications-list" class="notifications-list">
+                            <!-- Notifications will be added here -->
+                        </div>
+                    </div>
                     <!-- Auth Status -->
                     <div id="auth-status" class="auth-status">
                         <span id="user-email" class="user-email"></span>
@@ -49,6 +63,9 @@
             <button class="tab-btn" data-tab="progress">
                 <i class="fas fa-chart-line"></i> Progress
             </button>
+            <button id="admin-tab" class="tab-btn" data-tab="admin" style="display: none;">
+                <i class="fas fa-crown"></i> Admin
+            </button>
         </nav>
 
         <!-- Main Content -->
@@ -58,9 +75,14 @@
                 <div class="todo-section">
                     <div class="section-header">
                         <h2>My Tasks</h2>
-                        <button id="add-todo-btn" class="add-btn">
-                            <i class="fas fa-plus"></i> Add Task
-                        </button>
+                        <div class="todo-actions-header">
+                            <button id="add-todo-btn" class="add-btn">
+                                <i class="fas fa-plus"></i> Add Task
+                            </button>
+                            <button id="assigned-tasks-btn" class="filter-btn" style="display: none;">
+                                <i class="fas fa-user-check"></i> Assigned Tasks
+                            </button>
+                        </div>
                     </div>
                     
                     <div class="todo-filters">
@@ -68,6 +90,7 @@
                         <button class="filter-btn" data-filter="pending">Pending</button>
                         <button class="filter-btn" data-filter="completed">Completed</button>
                         <button class="filter-btn" data-filter="priority">Priority</button>
+                        <button class="filter-btn" data-filter="assigned" style="display: none;">Assigned to Me</button>
                     </div>
 
                     <div id="todo-list" class="todo-list">
@@ -144,6 +167,70 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Admin Tab -->
+            <div id="admin-tab" class="tab-content">
+                <div class="admin-section">
+                    <div class="section-header">
+                        <h2>Admin Dashboard</h2>
+                        <div class="admin-actions">
+                            <button id="add-user-btn" class="add-btn">
+                                <i class="fas fa-user-plus"></i> Add User
+                            </button>
+                            <button id="assign-task-btn" class="add-btn">
+                                <i class="fas fa-tasks"></i> Assign Task
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Admin Stats -->
+                    <div class="admin-stats">
+                        <div class="stat-card">
+                            <div class="stat-number" id="total-users">0</div>
+                            <div class="stat-label">Total Users</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="active-tasks">0</div>
+                            <div class="stat-label">Active Tasks</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="completed-tasks">0</div>
+                            <div class="stat-label">Completed Tasks</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="pending-tasks">0</div>
+                            <div class="stat-label">Pending Tasks</div>
+                        </div>
+                    </div>
+
+                    <!-- Admin Content -->
+                    <div class="admin-content">
+                        <!-- Users Management -->
+                        <div class="admin-panel">
+                            <h3>Users Management</h3>
+                            <div id="users-list" class="users-list">
+                                <!-- Users will be dynamically added here -->
+                            </div>
+                        </div>
+
+                        <!-- Assigned Tasks -->
+                        <div class="admin-panel">
+                            <h3>Assigned Tasks</h3>
+                            <div id="assigned-tasks-list" class="assigned-tasks-list">
+                                <!-- Assigned tasks will be dynamically added here -->
+                            </div>
+                        </div>
+
+                        <!-- Team Activity -->
+                        <div class="admin-panel">
+                            <h3>Team Activity</h3>
+                            <div id="team-activity" class="team-activity">
+                                <!-- Team activity will be dynamically added here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </main>
     </div>
 
@@ -191,6 +278,101 @@
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- User Management Modal -->
+    <div id="user-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="user-modal-title">Add User</h3>
+                <button class="close-btn" id="close-user-modal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="user-form">
+                <div class="form-group">
+                    <label for="user-email">Email</label>
+                    <input type="email" id="user-email" required>
+                </div>
+                <div class="form-group">
+                    <label for="user-name">Full Name</label>
+                    <input type="text" id="user-name" required>
+                </div>
+                <div class="form-group">
+                    <label for="user-role">Role</label>
+                    <select id="user-role" required>
+                        <option value="user">User</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="user-department">Department</label>
+                    <input type="text" id="user-department" placeholder="e.g., Development, Marketing">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" id="cancel-user">Cancel</button>
+                    <button type="submit" class="btn-primary">Save User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Task Assignment Modal -->
+    <div id="assign-task-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="assign-task-modal-title">Assign Task</h3>
+                <button class="close-btn" id="close-assign-task-modal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="assign-task-form">
+                <div class="form-group">
+                    <label for="assign-task-title">Task Title</label>
+                    <input type="text" id="assign-task-title" required>
+                </div>
+                <div class="form-group">
+                    <label for="assign-task-description">Description</label>
+                    <textarea id="assign-task-description" rows="3"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="assign-task-user">Assign To</label>
+                        <select id="assign-task-user" required>
+                            <option value="">Select User</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="assign-task-priority">Priority</label>
+                        <select id="assign-task-priority">
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="assign-task-due-date">Due Date</label>
+                        <input type="date" id="assign-task-due-date">
+                    </div>
+                    <div class="form-group">
+                        <label for="assign-task-category">Category</label>
+                        <select id="assign-task-category">
+                            <option value="general">General</option>
+                            <option value="development">Development</option>
+                            <option value="design">Design</option>
+                            <option value="marketing">Marketing</option>
+                            <option value="support">Support</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" id="cancel-assign-task">Cancel</button>
+                    <button type="submit" class="btn-primary">Assign Task</button>
+                </div>
+            </form>
         </div>
     </div>
 
