@@ -117,13 +117,24 @@ class SmartTodoApp {
                 }
             } else {
                 console.log('User document not found, creating one');
+                
+                // Check if this is the prepacked admin user
+                const isPrepackedAdmin = this.currentUser.email === 'nahidwebdesigner@gmail.com';
+                
                 // Create user document if it doesn't exist
                 await db.collection('users').doc(this.currentUser.uid).set({
                     email: this.currentUser.email,
-                    name: this.currentUser.displayName || this.currentUser.email,
-                    role: 'user', // Default role
-                    createdAt: new Date().toISOString()
+                    name: isPrepackedAdmin ? 'Nahid' : (this.currentUser.displayName || this.currentUser.email),
+                    role: isPrepackedAdmin ? 'admin' : 'user', // Admin for prepacked user
+                    createdAt: new Date().toISOString(),
+                    uid: this.currentUser.uid
                 });
+                
+                // Show admin panel if prepacked admin
+                if (isPrepackedAdmin) {
+                    console.log('Prepacked admin user created, showing admin panel');
+                    this.showAdminPanel();
+                }
             }
         } catch (error) {
             console.error('Error checking admin status:', error);
@@ -230,9 +241,18 @@ class SmartTodoApp {
         }
         
         try {
-            await auth.createUserWithEmailAndPassword(email, password);
+            const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+            
+            // Check if this is the prepacked admin user
+            const isPrepackedAdmin = email === 'nahidwebdesigner@gmail.com';
+            
+            if (isPrepackedAdmin) {
+                this.showNotification('Admin account created successfully! Welcome Nahid!', 'success');
+            } else {
+                this.showNotification('Account created successfully!', 'success');
+            }
+            
             this.closeAuthModal();
-            this.showNotification('Account created successfully!', 'success');
         } catch (error) {
             this.showNotification(error.message, 'error');
         }
