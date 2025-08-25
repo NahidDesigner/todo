@@ -89,6 +89,7 @@ class SmartTodoApp {
                 console.log('User signed in:', user.email);
                 await this.loadUserData();
                 this.setupRealtimeListeners();
+                await this.checkAndSetupAdmin(); // Add this line
             } else {
                 console.log('User signed out');
                 this.todos = [];
@@ -98,6 +99,62 @@ class SmartTodoApp {
                 this.updateStats();
             }
         });
+    }
+
+    // Check and setup admin features
+    async checkAndSetupAdmin() {
+        try {
+            const userDoc = await db.collection('users').doc(this.currentUser.uid).get();
+            if (userDoc.exists) {
+                const userData = userDoc.data();
+                console.log('User data:', userData);
+                
+                if (userData.role === 'admin') {
+                    console.log('User is admin, showing admin panel');
+                    this.showAdminPanel();
+                } else {
+                    console.log('User is not admin, role:', userData.role);
+                }
+            } else {
+                console.log('User document not found, creating one');
+                // Create user document if it doesn't exist
+                await db.collection('users').doc(this.currentUser.uid).set({
+                    email: this.currentUser.email,
+                    name: this.currentUser.displayName || this.currentUser.email,
+                    role: 'user', // Default role
+                    createdAt: new Date().toISOString()
+                });
+            }
+        } catch (error) {
+            console.error('Error checking admin status:', error);
+        }
+    }
+
+    // Show admin panel
+    showAdminPanel() {
+        const adminTab = document.getElementById('admin-tab');
+        const adminToggle = document.getElementById('admin-toggle');
+        const notificationsDropdown = document.getElementById('notifications-dropdown');
+        const assignedFilter = document.querySelector('[data-filter="assigned"]');
+        const assignedTasksBtn = document.getElementById('assigned-tasks-btn');
+        
+        if (adminTab) {
+            adminTab.style.display = 'block';
+            console.log('Admin tab shown');
+        }
+        if (adminToggle) {
+            adminToggle.style.display = 'block';
+            console.log('Admin toggle shown');
+        }
+        if (notificationsDropdown) {
+            notificationsDropdown.style.display = 'block';
+        }
+        if (assignedFilter) {
+            assignedFilter.style.display = 'block';
+        }
+        if (assignedTasksBtn) {
+            assignedTasksBtn.style.display = 'block';
+        }
     }
 
     updateAuthUI() {
