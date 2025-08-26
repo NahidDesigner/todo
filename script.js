@@ -415,7 +415,7 @@ class SmartTodoApp {
         
         // Prevent deleting assigned tasks by users
         const target = this.todos.find(t => t.id === todoId);
-        if (target && (target.assignedBy || target.assignedTo)) {
+        if (target && (target.assignedBy || target.assignedTo || target.assignedTaskId)) {
             this.showNotification('Assigned tasks can only be deleted by admin.', 'warning');
             return;
         }
@@ -712,28 +712,38 @@ class SmartTodoApp {
             }
 
             // If this was an assigned task, notify admin and log activity on completion
-            if (todo.assignedBy && todo.assignedTo && todo.completed) {
+            if (todo.assignedBy && todo.assignedTo) {
                 try {
-                    // Notify the assigning admin
-                    await db.collection('notifications').add({
-                        userId: todo.assignedBy,
-                        title: 'Task Completed',
-                        message: `Assigned task completed: ${todo.title}`,
-                        type: 'task_completed',
-                        taskId: todo.id,
-                        createdAt: new Date().toISOString(),
-                        read: false
-                    });
-                    // Log team activity
-                    await db.collection('teamActivity').add({
-                        type: 'task_completed',
-                        message: `${this.currentUser?.email || 'User'} completed "${todo.title}"`,
-                        taskId: todo.id,
-                        userId: this.currentUser?.uid,
-                        createdAt: new Date().toISOString()
-                    });
+                    if (todo.completed) {
+                        await db.collection('notifications').add({
+                            userId: todo.assignedBy,
+                            title: 'Task Completed',
+                            message: `Assigned task completed: ${todo.title}`,
+                            type: 'task_completed',
+                            taskId: todo.id,
+                            createdAt: new Date().toISOString(),
+                            read: false
+                        });
+                        await db.collection('teamActivity').add({
+                            type: 'task_completed',
+                            message: `${this.currentUser?.email || 'User'} completed "${todo.title}"`,
+                            taskId: todo.id,
+                            userId: this.currentUser?.uid,
+                            createdAt: new Date().toISOString()
+                        });
+                    } else {
+                        await db.collection('notifications').add({
+                            userId: todo.assignedBy,
+                            title: 'Task Reopened',
+                            message: `Assigned task reopened: ${todo.title}`,
+                            type: 'task_reopened',
+                            taskId: todo.id,
+                            createdAt: new Date().toISOString(),
+                            read: false
+                        });
+                    }
                 } catch (error) {
-                    console.error('Error creating completion notifications/activity:', error);
+                    console.error('Error creating status notifications/activity:', error);
                 }
             }
         }

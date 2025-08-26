@@ -15,6 +15,28 @@ class AdminPanel {
 	init() {
 		this.setupEventListeners();
 		this.refreshAll();
+		this.subscribeRealtime();
+	}
+
+	subscribeRealtime() {
+		// Users
+		db.collection('users').onSnapshot((snapshot) => {
+			this.users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+			this.renderUsers();
+		});
+		// Assigned tasks
+		db.collection('assignedTasks').onSnapshot((snapshot) => {
+			const tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+			// Sort by due date then createdAt
+			this.assignedTasks = tasks.sort((a, b) => {
+				const aDue = a.dueDate ? new Date(a.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
+				const bDue = b.dueDate ? new Date(b.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
+				if (aDue !== bDue) return aDue - bDue;
+				return new Date(b.createdAt) - new Date(a.createdAt);
+			});
+			this.renderAssignedTasks();
+			this.loadAdminStats();
+		});
 	}
 
 	setupEventListeners() {

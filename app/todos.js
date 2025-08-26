@@ -50,30 +50,33 @@ class TodosModule {
 			return `
 				<div class="todo-day-group">
 					<div class="todo-day-header">${dateStr}</div>
-					${items.map(todo => `
-						<div class="todo-item ${todo.completed ? 'completed' : ''} fade-in" data-id="${todo.id}">
-							<div class="todo-header">
-								<div class="checkbox-wrapper">
-									<div class="checkbox ${todo.completed ? 'checked' : ''}"></div>
-									<div class="todo-title">${this.app.escapeHtml(todo.title)}</div>
+					${items.map(todo => {
+						const isAssigned = !!(todo.assignedBy || todo.assignedTo || todo.assignedTaskId);
+						return `
+							<div class="todo-item ${todo.completed ? 'completed' : ''} fade-in" data-id="${todo.id}">
+								<div class="todo-header">
+									<div class="checkbox-wrapper">
+										<div class="checkbox ${todo.completed ? 'checked' : ''}"></div>
+										<div class="todo-title">${this.app.escapeHtml(todo.title)}</div>
+									</div>
+									<div class="todo-actions">
+										<button class="todo-action-btn" title="Edit">
+											<i class="fas fa-edit"></i>
+										</button>
+										${isAssigned ? '' : `
+										<button class=\"todo-action-btn\" title=\"Delete\"> 
+											<i class=\"fas fa-trash\"></i>
+										</button>`}
+									</div>
 								</div>
-								<div class="todo-actions">
-									<button class="todo-action-btn" title="Edit">
-										<i class="fas fa-edit"></i>
-									</button>
-									<button class="todo-action-btn" title="Delete">
-										<i class="fas fa-trash"></i>
-									</button>
+								${todo.description ? `<div class="todo-description">${this.app.escapeHtml(todo.description)}</div>` : ''}
+								<div class="todo-meta">
+									<span class="todo-priority ${todo.priority}">${todo.priority}</span>
+									${todo.dueDate ? `<span>Due: ${this.app.formatDate(todo.dueDate)}</span>` : ''}
+									<span>Created: ${this.app.formatDate(todo.createdAt)}</span>
 								</div>
-							</div>
-							${todo.description ? `<div class="todo-description">${this.app.escapeHtml(todo.description)}</div>` : ''}
-							<div class="todo-meta">
-								<span class="todo-priority ${todo.priority}">${todo.priority}</span>
-								${todo.dueDate ? `<span>Due: ${this.app.formatDate(todo.dueDate)}</span>` : ''}
-								<span>Created: ${this.app.formatDate(todo.createdAt)}</span>
-							</div>
-						</div>
-					`).join('')}
+							</div>`;
+						}).join('')}
 				</div>
 			`;
 		}).join('');
