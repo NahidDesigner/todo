@@ -41,25 +41,29 @@ class AdminServices {
 		// Persist assigned task
 		const docRef = await db.collection('assignedTasks').add(taskData);
 		const taskId = docRef.id;
-		// Add into user's todos subcollection
-		await db.collection('users').doc(taskData.assignedTo)
-			.collection('todos').doc(taskId).set({ ...taskData, id: taskId });
-		// Notify assignee
-		await this.createNotification({
-			userId: taskData.assignedTo,
-			title: 'New Task Assigned',
-			message: `You have been assigned: ${taskData.title}`,
-			type: 'task_assigned',
-			taskId: taskId,
-			createdAt: new Date().toISOString(),
-			read: false
-		});
+		// Add into user's todos subcollection if we have a uid
+		if (taskData.assignedTo) {
+			await db.collection('users').doc(taskData.assignedTo)
+				.collection('todos').doc(taskId).set({ ...taskData, id: taskId });
+		}
+		// Notify assignee only if they have an account (uid)
+		if (taskData.assignedTo) {
+			await this.createNotification({
+				userId: taskData.assignedTo,
+				title: 'New Task Assigned',
+				message: `You have been assigned: ${taskData.title}`,
+				type: 'task_assigned',
+				taskId: taskId,
+				createdAt: new Date().toISOString(),
+				read: false
+			});
+		}
 		// Team activity
 		await db.collection('teamActivity').add({
 			type: 'task_assigned',
 			message: `${this.app.currentUser?.email || 'Admin'} assigned "${taskData.title}"`,
 			taskId: taskId,
-			userId: taskData.assignedTo,
+			userId: taskData.assignedTo || taskData.assignedProfileId,
 			createdAt: new Date().toISOString()
 		});
 		return taskId;

@@ -116,10 +116,11 @@ class AdminPanel {
 		const modal = document.getElementById('assign-task-modal');
 		const userSelect = document.getElementById('assign-task-user');
 		userSelect.innerHTML = '<option value="">Select User</option>';
-		this.users.filter(u => !!u.uid).forEach(user => {
+		this.users.forEach(user => {
 			const option = document.createElement('option');
-			option.value = user.uid;
-			option.textContent = `${user.name || user.email} (${user.email || user.uid})`;
+			const hasUid = !!user.uid;
+			option.value = hasUid ? `uid:${user.uid}` : `profile:${user.id}`;
+			option.textContent = `${user.name || user.email || 'Unnamed'}${hasUid ? '' : ' (no account)'}${user.email ? ` (${user.email})` : ''}`;
 			userSelect.appendChild(option);
 		});
 		document.getElementById('assign-task-form').reset();
@@ -132,10 +133,16 @@ class AdminPanel {
 	async handleAssignTaskSubmit(e) {
 		e.preventDefault();
 		const formData = new FormData(e.target);
+		const selected = formData.get('assign-task-user');
+		if (!selected) return;
+		const [kind, id] = selected.split(':');
+		const assignedTo = kind === 'uid' ? id : null;
+		const assignedProfileId = kind === 'profile' ? id : null;
 		const taskData = {
 			title: formData.get('assign-task-title'),
 			description: formData.get('assign-task-description') || '',
-			assignedTo: formData.get('assign-task-user'),
+			assignedTo,
+			assignedProfileId,
 			assignedBy: this.app.currentUser.uid,
 			priority: formData.get('assign-task-priority'),
 			dueDate: formData.get('assign-task-due-date') || '',
@@ -163,7 +170,9 @@ class AdminPanel {
 			return;
 		}
 		list.innerHTML = this.assignedTasks.map(task => {
-			const assignedUser = this.users.find(u => u.uid === task.assignedTo);
+			const assignedUser = task.assignedTo 
+				? this.users.find(u => u.uid === task.assignedTo)
+				: this.users.find(u => u.id === task.assignedProfileId);
 			return `
 				<div class="assigned-task-item">
 					<div class="assigned-task-header">
@@ -171,7 +180,7 @@ class AdminPanel {
 						<span class="todo-priority ${task.priority}">${task.priority}</span>
 					</div>
 					<div class="assigned-task-meta">
-						<span>Assigned to: ${assignedUser ? assignedUser.name : 'Unknown'}</span>
+						<span>Assigned to: ${assignedUser ? (assignedUser.name || assignedUser.email || 'Unnamed') : 'Unknown'}</span>
 						${task.dueDate ? `<span>Due: ${this.app.formatDate(task.dueDate)}</span>` : ''}
 						<span>Status: ${task.completed ? 'Completed' : 'Pending'}</span>
 					</div>
