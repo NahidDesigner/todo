@@ -217,6 +217,12 @@
                         <!-- Assigned Tasks -->
                         <div class="admin-panel">
                             <h3>Assigned Tasks</h3>
+                            <div class="assigned-filters" style="display:flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+                                <button class="btn-secondary" data-assigned-filter="active">Active</button>
+                                <button class="btn-secondary" data-assigned-filter="completed">Completed</button>
+                                <button class="btn-secondary" data-assigned-filter="high">High Priority</button>
+                                <button class="btn-secondary" data-assigned-filter="all">All</button>
+                            </div>
                             <div id="assigned-tasks-list" class="assigned-tasks-list">
                                 <!-- Assigned tasks will be dynamically added here -->
                             </div>

@@ -53,6 +53,13 @@ class AdminPanel {
 		document.getElementById('assign-task-form')?.addEventListener('submit', (e) => this.handleAssignTaskSubmit(e));
 
 		document.getElementById('notifications-btn')?.addEventListener('click', () => this.toggleNotifications());
+		// Assigned filters
+		document.querySelectorAll('[data-assigned-filter]')?.forEach(btn => {
+			btn.addEventListener('click', (e) => {
+				this.currentAssignedFilter = e.currentTarget.dataset.assignedFilter;
+				this.renderAssignedTasks();
+			});
+		});
 	}
 
 	async refreshAll() {
@@ -210,6 +217,11 @@ class AdminPanel {
 		const active = this.assignedTasks.filter(t => !t.completed);
 		const completed = this.assignedTasks.filter(t => t.completed);
 		const highPriority = active.filter(t => (t.priority || 'medium') === 'high');
+		let filteredSets = [highPriority, active, completed];
+		if (this.currentAssignedFilter === 'active') filteredSets = [active];
+		if (this.currentAssignedFilter === 'completed') filteredSets = [completed];
+		if (this.currentAssignedFilter === 'high') filteredSets = [highPriority];
+		if (this.currentAssignedFilter === 'all') filteredSets = [this.assignedTasks];
 		const renderSection = (title, items) => `
 			<div class="admin-section-block">
 				<h4 style="margin: 0.5rem 0 0.75rem 0;">${title} (${items.length})</h4>
@@ -239,11 +251,15 @@ class AdminPanel {
 				}).join('')}
 			</div>
 		`;
-		list.innerHTML = [
-			renderSection('High Priority', highPriority),
-			renderSection('Active Tasks', active),
-			renderSection('Completed Tasks', completed)
-		].join('');
+		list.innerHTML = (
+			filteredSets.length === 1 && filteredSets[0] === this.assignedTasks
+				? renderSection('All Tasks', this.assignedTasks)
+				: [
+					renderSection('High Priority', highPriority),
+					renderSection('Active Tasks', active),
+					renderSection('Completed Tasks', completed)
+				].join('')
+		);
 	}
 
 	async editAssignedTask(taskId) {
