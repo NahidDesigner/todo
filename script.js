@@ -679,15 +679,10 @@ class SmartTodoApp {
         }
         
         return filtered.sort((a, b) => {
-            // Sort by priority first, then by creation date
-            const priorityOrder = { high: 3, medium: 2, low: 1 };
-            const aPriority = priorityOrder[a.priority] || 1;
-            const bPriority = priorityOrder[b.priority] || 1;
-            
-            if (aPriority !== bPriority) {
-                return bPriority - aPriority;
-            }
-            
+            // Sort by due date ascending (empty due dates last), then by creation date desc
+            const aDue = a.dueDate ? new Date(a.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
+            const bDue = b.dueDate ? new Date(b.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
+            if (aDue !== bDue) return aDue - bDue;
             return new Date(b.createdAt) - new Date(a.createdAt);
         });
     }
@@ -716,6 +711,18 @@ class SmartTodoApp {
             await this.saveTodo(todo);
             this.renderTodos();
             this.updateStats();
+
+            // Sync assignedTasks collection if this is an assigned task
+            if (todo.id && (todo.assignedBy || todo.assignedTo)) {
+                try {
+                    await db.collection('assignedTasks').doc(todo.id).set({
+                        completed: !!todo.completed,
+                        completedAt: todo.completed ? todo.completedAt : null
+                    }, { merge: true });
+                } catch (err) {
+                    console.error('Error syncing assignedTasks on toggle:', err);
+                }
+            }
 
             // If this was an assigned task, notify admin and log activity on completion
             if (todo.assignedBy && todo.assignedTo && todo.completed) {

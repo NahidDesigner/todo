@@ -34,7 +34,14 @@ class AdminServices {
 			.orderBy('createdAt', 'desc')
 			.limit(limit)
 			.get();
-		return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+		const tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+		// Sort: dueDate asc (empty last), then createdAt desc
+		return tasks.sort((a, b) => {
+			const aDue = a.dueDate ? new Date(a.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
+			const bDue = b.dueDate ? new Date(b.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
+			if (aDue !== bDue) return aDue - bDue;
+			return new Date(b.createdAt) - new Date(a.createdAt);
+		});
 	}
 
 	async assignTask(taskData) {

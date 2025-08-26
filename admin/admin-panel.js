@@ -174,7 +174,7 @@ class AdminPanel {
 				? this.users.find(u => u.uid === task.assignedTo)
 				: this.users.find(u => u.id === task.assignedProfileId);
 			return `
-				<div class="assigned-task-item">
+				<div class="assigned-task-item" data-id="${task.id}">
 					<div class="assigned-task-header">
 						<div class="assigned-task-title">${task.title}</div>
 						<span class="todo-priority ${task.priority}">${task.priority}</span>
@@ -185,9 +185,60 @@ class AdminPanel {
 						<span>Status: ${task.completed ? 'Completed' : 'Pending'}</span>
 					</div>
 					${task.description ? `<div class="assigned-task-description">${task.description}</div>` : ''}
+					<div class="assigned-task-actions">
+						<button class="btn-secondary" onclick="adminPanel.editAssignedTask('${task.id}')">Edit</button>
+					</div>
 				</div>
 			`;
 		}).join('');
+	}
+
+	async editAssignedTask(taskId) {
+		const task = this.assignedTasks.find(t => t.id === taskId);
+		if (!task) return;
+		// Prefill assign modal and reuse
+		this.openAssignTaskModal();
+		document.getElementById('assign-task-title').value = task.title || '';
+		document.getElementById('assign-task-description').value = task.description || '';
+		const select = document.getElementById('assign-task-user');
+		if (task.assignedTo) select.value = `uid:${task.assignedTo}`;
+		else if (task.assignedProfileId) select.value = `profile:${task.assignedProfileId}`;
+		document.getElementById('assign-task-priority').value = task.priority || 'medium';
+		document.getElementById('assign-task-due-date').value = task.dueDate || '';
+		document.getElementById('assign-task-category').value = task.category || 'general';
+		// Temporarily override submit handler to update
+		const form = document.getElementById('assign-task-form');
+		const originalHandler = this._assignHandlerRef;
+		if (originalHandler) form.removeEventListener('submit', originalHandler);
+		this._assignHandlerRef = async (e) => {
+			e.preventDefault();
+			const fd = new FormData(form);
+			const selected = fd.get('assign-task-user');
+			const [kind, id] = (selected || '').split(':');
+			const update = {
+				title: fd.get('assign-task-title'),
+				description: fd.get('assign-task-description') || '',
+				assignedTo: kind === 'uid' ? id : null,
+				assignedProfileId: kind === 'profile' ? id : null,
+				priority: fd.get('assign-task-priority'),
+				dueDate: fd.get('assign-task-due-date') || '',
+				category: fd.get('assign-task-category')
+			};
+			await db.collection('assignedTasks').doc(taskId).set(update, { merge: true });
+			// Update user's subcollection if it has uid
+			if (update.assignedTo) {
+				await db.collection('users').doc(update.assignedTo)
+					.collection('todos').doc(taskId).set({ ...task, ...update, id: taskId }, { merge: true });
+			}
+			this.closeAssignTaskModal();
+			await this.loadAssignedTasks();
+			this.app.showNotification('Assigned task updated.', 'success');
+			// Restore default submit handler
+			form.removeEventListener('submit', this._assignHandlerRef);
+			this._assignHandlerRef = null;
+			form.addEventListener('submit', (ev) => this.handleAssignTaskSubmit(ev));
+		};
+		form.addEventListener('submit', this._assignHandlerRef);
 	}
 
 	async loadTeamActivity() {
