@@ -47,7 +47,7 @@ class AdminPanel {
 
     // Admin Panel Toggle
     toggleAdminPanel() {
-        const adminTab = document.getElementById('admin-tab');
+        const adminTab = document.getElementById('admin-tab-btn');
         if (adminTab) {
             this.app.switchTab('admin');
         }
@@ -463,7 +463,7 @@ class AdminPanel {
         const isAdmin = this.checkAdminStatus();
         
         // Show/hide admin tab
-        const adminTab = document.getElementById('admin-tab');
+        const adminTab = document.getElementById('admin-tab-btn');
         if (adminTab) {
             adminTab.style.display = isAdmin ? 'block' : 'none';
         }

@@ -143,7 +143,7 @@ class SmartTodoApp {
 
     // Show admin panel
     showAdminPanel() {
-        const adminTab = document.getElementById('admin-tab');
+        const adminTab = document.getElementById('admin-tab-btn');
         const adminToggle = document.getElementById('admin-toggle');
         const notificationsDropdown = document.getElementById('notifications-dropdown');
         const assignedFilter = document.querySelector('[data-filter="assigned"]');

@@ -12,7 +12,7 @@ if (window.app) {
     
     app.setupAdminFeatures = function() {
         // Show all admin elements
-        const adminTab = document.getElementById('admin-tab');
+        const adminTab = document.getElementById('admin-tab-btn');
         const adminToggle = document.getElementById('admin-toggle');
         const notificationsDropdown = document.getElementById('notifications-dropdown');
         const assignedFilter = document.querySelector('[data-filter="assigned"]');
