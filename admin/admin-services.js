@@ -46,12 +46,12 @@ class AdminServices {
 
 	async assignTask(taskData) {
 		// Persist assigned task
-		const docRef = await db.collection('assignedTasks').add(taskData);
+		const docRef = await db.collection('assignedTasks').add({ ...taskData, assignedTaskId: undefined });
 		const taskId = docRef.id;
 		// Add into user's todos subcollection if we have a uid
 		if (taskData.assignedTo) {
 			await db.collection('users').doc(taskData.assignedTo)
-				.collection('todos').doc(taskId).set({ ...taskData, id: taskId });
+				.collection('todos').doc(taskId).set({ ...taskData, id: taskId, assignedTaskId: taskId }, { merge: true });
 		}
 		// Notify assignee only if they have an account (uid)
 		if (taskData.assignedTo) {

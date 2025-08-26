@@ -337,7 +337,11 @@ class SmartTodoApp {
         db.collection('users').doc(this.currentUser.uid)
             .collection('todos')
             .onSnapshot((snapshot) => {
-                this.todos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                // Deduplicate by id (should be unique, just in case)
+                const map = new Map();
+                list.forEach(t => map.set(t.id, t));
+                this.todos = Array.from(map.values());
                 this.renderTodos();
                 this.updateStats();
             });
@@ -406,6 +410,13 @@ class SmartTodoApp {
             this.saveLocalTodos();
             this.renderTodos();
             this.updateStats();
+            return;
+        }
+        
+        // Prevent deleting assigned tasks by users
+        const target = this.todos.find(t => t.id === todoId);
+        if (target && (target.assignedBy || target.assignedTo)) {
+            this.showNotification('Assigned tasks can only be deleted by admin.', 'warning');
             return;
         }
         

@@ -8,6 +8,7 @@ class AdminPanel {
 		this.assignedTasks = [];
 		this.teamActivity = [];
 		this.notifications = [];
+		this.editTaskId = null;
 		this.init();
 	}
 
@@ -112,7 +113,7 @@ class AdminPanel {
 	}
 
 	// Assign tasks
-	openAssignTaskModal() {
+	openAssignTaskModal(task = null) {
 		const modal = document.getElementById('assign-task-modal');
 		const userSelect = document.getElementById('assign-task-user');
 		userSelect.innerHTML = '<option value="">Select User</option>';
@@ -123,8 +124,19 @@ class AdminPanel {
 			option.textContent = `${user.name || user.email || 'Unnamed'}${hasUid ? '' : ' (no account)'}${user.email ? ` (${user.email})` : ''}`;
 			userSelect.appendChild(option);
 		});
-		document.getElementById('assign-task-form').reset();
+		const form = document.getElementById('assign-task-form');
+		form.reset();
 		document.getElementById('assign-task-due-date').value = new Date().toISOString().split('T')[0];
+		this.editTaskId = task?.id || null;
+		if (task) {
+			document.getElementById('assign-task-title').value = task.title || '';
+			document.getElementById('assign-task-description').value = task.description || '';
+			if (task.assignedTo) userSelect.value = `uid:${task.assignedTo}`;
+			else if (task.assignedProfileId) userSelect.value = `profile:${task.assignedProfileId}`;
+			document.getElementById('assign-task-priority').value = task.priority || 'medium';
+			document.getElementById('assign-task-due-date').value = task.dueDate || '';
+			document.getElementById('assign-task-category').value = task.category || 'general';
+		}
 		modal.classList.add('active');
 	}
 
@@ -138,12 +150,11 @@ class AdminPanel {
 		const [kind, id] = selected.split(':');
 		const assignedTo = kind === 'uid' ? id : null;
 		const assignedProfileId = kind === 'profile' ? id : null;
-		const taskData = {
+		const update = {
 			title: formData.get('assign-task-title'),
 			description: formData.get('assign-task-description') || '',
 			assignedTo,
 			assignedProfileId,
-			assignedBy: this.app.currentUser.uid,
 			priority: formData.get('assign-task-priority'),
 			dueDate: formData.get('assign-task-due-date') || '',
 			category: formData.get('assign-task-category'),
@@ -151,10 +162,29 @@ class AdminPanel {
 			createdAt: new Date().toISOString(),
 			completed: false
 		};
-		await this.services.assignTask(taskData);
+		if (this.editTaskId) {
+			const taskId = this.editTaskId;
+			await db.collection('assignedTasks').doc(taskId).set(update, { merge: true });
+			if (assignedTo) {
+				await db.collection('users').doc(assignedTo)
+					.collection('todos').doc(taskId).set({ ...update, id: taskId, assignedTaskId: taskId }, { merge: true });
+				await db.collection('notifications').add({
+					userId: assignedTo,
+					title: 'Assigned Task Updated',
+					message: `${update.title} was updated by admin`,
+					type: 'task_updated',
+					taskId: taskId,
+					createdAt: new Date().toISOString(),
+					read: false
+				});
+			}
+		} else {
+			await this.services.assignTask({ ...update, assignedBy: this.app.currentUser.uid });
+		}
 		this.closeAssignTaskModal();
 		await this.loadAssignedTasks();
-		this.app.showNotification('Task assigned successfully!', 'success');
+		this.app.showNotification(this.editTaskId ? 'Assigned task updated.' : 'Task assigned successfully!', 'success');
+		this.editTaskId = null;
 	}
 
 	async loadAssignedTasks() {
@@ -211,59 +241,7 @@ class AdminPanel {
 	async editAssignedTask(taskId) {
 		const task = this.assignedTasks.find(t => t.id === taskId);
 		if (!task) return;
-		// Prefill assign modal and reuse
-		this.openAssignTaskModal();
-		document.getElementById('assign-task-title').value = task.title || '';
-		document.getElementById('assign-task-description').value = task.description || '';
-		const select = document.getElementById('assign-task-user');
-		if (task.assignedTo) select.value = `uid:${task.assignedTo}`;
-		else if (task.assignedProfileId) select.value = `profile:${task.assignedProfileId}`;
-		document.getElementById('assign-task-priority').value = task.priority || 'medium';
-		document.getElementById('assign-task-due-date').value = task.dueDate || '';
-		document.getElementById('assign-task-category').value = task.category || 'general';
-		// Temporarily override submit handler to update
-		const form = document.getElementById('assign-task-form');
-		const originalHandler = this._assignHandlerRef;
-		if (originalHandler) form.removeEventListener('submit', originalHandler);
-		this._assignHandlerRef = async (e) => {
-			e.preventDefault();
-			const fd = new FormData(form);
-			const selected = fd.get('assign-task-user');
-			const [kind, id] = (selected || '').split(':');
-			const update = {
-				title: fd.get('assign-task-title'),
-				description: fd.get('assign-task-description') || '',
-				assignedTo: kind === 'uid' ? id : null,
-				assignedProfileId: kind === 'profile' ? id : null,
-				priority: fd.get('assign-task-priority'),
-				dueDate: fd.get('assign-task-due-date') || '',
-				category: fd.get('assign-task-category')
-			};
-			await db.collection('assignedTasks').doc(taskId).set(update, { merge: true });
-			// Update user's subcollection if it has uid
-			if (update.assignedTo) {
-				await db.collection('users').doc(update.assignedTo)
-					.collection('todos').doc(taskId).set({ ...task, ...update, id: taskId }, { merge: true });
-				// Notify assignee about update
-				await db.collection('notifications').add({
-					userId: update.assignedTo,
-					title: 'Assigned Task Updated',
-					message: `${task.title} was updated by admin`,
-					type: 'task_updated',
-					taskId: taskId,
-					createdAt: new Date().toISOString(),
-					read: false
-				});
-			}
-			this.closeAssignTaskModal();
-			await this.loadAssignedTasks();
-			this.app.showNotification('Assigned task updated.', 'success');
-			// Restore default submit handler
-			form.removeEventListener('submit', this._assignHandlerRef);
-			this._assignHandlerRef = null;
-			form.addEventListener('submit', (ev) => this.handleAssignTaskSubmit(ev));
-		};
-		form.addEventListener('submit', this._assignHandlerRef);
+		this.openAssignTaskModal(task);
 	}
 
 	async toggleAssignedCompleted(taskId, completed) {
