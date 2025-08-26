@@ -229,6 +229,16 @@ class AdminPanel {
 			if (update.assignedTo) {
 				await db.collection('users').doc(update.assignedTo)
 					.collection('todos').doc(taskId).set({ ...task, ...update, id: taskId }, { merge: true });
+				// Notify assignee about update
+				await db.collection('notifications').add({
+					userId: update.assignedTo,
+					title: 'Assigned Task Updated',
+					message: `${task.title} was updated by admin`,
+					type: 'task_updated',
+					taskId: taskId,
+					createdAt: new Date().toISOString(),
+					read: false
+				});
 			}
 			this.closeAssignTaskModal();
 			await this.loadAssignedTasks();
@@ -239,6 +249,30 @@ class AdminPanel {
 			form.addEventListener('submit', (ev) => this.handleAssignTaskSubmit(ev));
 		};
 		form.addEventListener('submit', this._assignHandlerRef);
+	}
+
+	async toggleAssignedCompleted(taskId, completed) {
+		const task = this.assignedTasks.find(t => t.id === taskId);
+		if (!task) return;
+		await db.collection('assignedTasks').doc(taskId).set({
+			completed: !!completed,
+			completedAt: completed ? new Date().toISOString() : null
+		}, { merge: true });
+		if (task.assignedTo) {
+			await db.collection('users').doc(task.assignedTo)
+				.collection('todos').doc(taskId).set({ completed: !!completed, completedAt: completed ? new Date().toISOString() : null }, { merge: true });
+			// Notify assignee of status change
+			await db.collection('notifications').add({
+				userId: task.assignedTo,
+				title: completed ? 'Task Marked Completed' : 'Task Marked Pending',
+				message: `${task.title} status was updated by admin`,
+				type: 'task_status_changed',
+				taskId: taskId,
+				createdAt: new Date().toISOString(),
+				read: false
+			});
+		}
+		await this.loadAssignedTasks();
 	}
 
 	async loadTeamActivity() {

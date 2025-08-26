@@ -333,44 +333,20 @@ class SmartTodoApp {
     setupRealtimeListeners() {
         if (!this.currentUser) return;
         
-        // Real-time todos listener
+        // Real-time todos listener (assign full array to avoid duplicates)
         db.collection('users').doc(this.currentUser.uid)
             .collection('todos')
             .onSnapshot((snapshot) => {
-                snapshot.docChanges().forEach((change) => {
-                    if (change.type === 'added' || change.type === 'modified') {
-                        const todo = { id: change.doc.id, ...change.doc.data() };
-                        const index = this.todos.findIndex(t => t.id === todo.id);
-                        if (index !== -1) {
-                            this.todos[index] = todo;
-                        } else {
-                            this.todos.push(todo);
-                        }
-                    } else if (change.type === 'removed') {
-                        this.todos = this.todos.filter(t => t.id !== change.doc.id);
-                    }
-                });
+                this.todos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 this.renderTodos();
                 this.updateStats();
             });
         
-        // Real-time learning listener
+        // Real-time learning listener (assign full array)
         db.collection('users').doc(this.currentUser.uid)
             .collection('learning')
             .onSnapshot((snapshot) => {
-                snapshot.docChanges().forEach((change) => {
-                    if (change.type === 'added' || change.type === 'modified') {
-                        const learning = { id: change.doc.id, ...change.doc.data() };
-                        const index = this.learningItems.findIndex(l => l.id === learning.id);
-                        if (index !== -1) {
-                            this.learningItems[index] = learning;
-                        } else {
-                            this.learningItems.push(learning);
-                        }
-                    } else if (change.type === 'removed') {
-                        this.learningItems = this.learningItems.filter(l => l.id !== change.doc.id);
-                    }
-                });
+                this.learningItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 this.renderLearningItems();
                 this.updateStats();
             });
