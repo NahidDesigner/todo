@@ -166,6 +166,14 @@ class SmartTodoApp {
         if (assignedTasksBtn) {
             assignedTasksBtn.style.display = 'block';
         }
+
+        // Initialize AdminPanel once and expose globally
+        if (!window.adminPanel && window.AdminPanel) {
+            window.adminPanel = new window.AdminPanel(this);
+            // Initial load for notifications after admin panel constructed
+            window.adminPanel.loadNotifications?.();
+            window.adminPanel.updateAdminUI?.();
+        }
     }
 
     updateAuthUI() {
