@@ -336,14 +336,42 @@ class SmartTodoApp {
         // Real-time todos listener (assign full array to avoid duplicates)
         db.collection('users').doc(this.currentUser.uid)
             .collection('todos')
-            .onSnapshot((snapshot) => {
+            .onSnapshot(async (snapshot) => {
                 const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                // Deduplicate by id (should be unique, just in case)
-                const map = new Map();
-                list.forEach(t => map.set(t.id, t));
-                this.todos = Array.from(map.values());
+                // Deduplicate by id
+                const idMap = new Map();
+                list.forEach(t => idMap.set(t.id, t));
+                let deduped = Array.from(idMap.values());
+                // Further deduplicate by assignedTaskId, prefer record where id === assignedTaskId
+                const groups = new Map();
+                for (const t of deduped) {
+                    const key = t.assignedTaskId || null;
+                    if (!key) continue;
+                    if (!groups.has(key)) groups.set(key, []);
+                    groups.get(key).push(t);
+                }
+                const toKeepIds = new Set(deduped.map(t => t.id));
+                const toDeleteIds = [];
+                groups.forEach((items, key) => {
+                    if (items.length <= 1) return;
+                    const preferred = items.find(it => it.id === key) || items[0];
+                    items.forEach(it => {
+                        if (it.id !== preferred.id) {
+                            toDeleteIds.push(it.id);
+                            toKeepIds.delete(it.id);
+                        }
+                    });
+                });
+                // Apply dedup result locally
+                deduped = deduped.filter(t => toKeepIds.has(t.id));
+                this.todos = deduped;
                 this.renderTodos();
                 this.updateStats();
+                // Cleanup duplicates in Firestore (best-effort)
+                try {
+                    await Promise.all(toDeleteIds.map(dupId => db.collection('users').doc(this.currentUser.uid)
+                        .collection('todos').doc(dupId).delete().catch(() => {})));
+                } catch (_) {}
             });
         
         // Real-time learning listener (assign full array)
