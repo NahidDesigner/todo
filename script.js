@@ -11,6 +11,12 @@ class SmartTodoApp {
         this.currentUser = null;
         this.isOnline = navigator.onLine;
         
+        // Modules
+        this.notificationsManager = null;
+        this.todosModule = null;
+        this.learningModule = null;
+        this.progressModule = null;
+        
         this.init();
     }
 
@@ -20,6 +26,12 @@ class SmartTodoApp {
         this.setupFirebaseAuth();
         this.setupOnlineStatus();
         this.setupSampleData();
+        
+        // Initialize modules
+        if (window.NotificationsManager) this.notificationsManager = new window.NotificationsManager(this);
+        if (window.TodosModule) this.todosModule = new window.TodosModule(this);
+        if (window.LearningModule) this.learningModule = new window.LearningModule(this);
+        if (window.ProgressModule) this.progressModule = new window.ProgressModule(this);
     }
 
     setupEventListeners() {
@@ -91,12 +103,8 @@ class SmartTodoApp {
                 this.setupRealtimeListeners();
                 await this.checkAndSetupAdmin(); // Add this line
 
-                // Ensure AdminPanel exists for all users to power notifications
-                if (!window.adminPanel && window.AdminPanel) {
-                    window.adminPanel = new window.AdminPanel(this);
-                }
-                // Subscribe notifications for signed-in user
-                window.adminPanel?.subscribeNotifications?.();
+                // Notifications subscription via NotificationsManager
+                this.notificationsManager?.subscribe();
                 // Show notifications UI for all signed-in users
                 const notificationsDropdown = document.getElementById('notifications-dropdown');
                 if (notificationsDropdown) notificationsDropdown.style.display = 'block';
@@ -609,6 +617,11 @@ class SmartTodoApp {
         const todoList = document.getElementById('todo-list');
         const filteredTodos = this.getFilteredTodos();
         
+        if (this.todosModule) {
+            this.todosModule.render(filteredTodos, this.currentFilter);
+            return;
+        }
+
         if (filteredTodos.length === 0) {
             todoList.innerHTML = `
                 <div class="empty-state">
@@ -826,12 +839,17 @@ class SmartTodoApp {
         if (todayItems.length === 0) {
             learningList.innerHTML = `
                 <div class="empty-state">
-                    <i class="fas fa-graduation-cap" style="font-size: 3rem; color: var(--text-muted); margin-bottom: 1rem;"></i>
+                    <i class="fas fa-book-open" style="font-size: 3rem; color: var(--text-muted); margin-bottom: 1rem;"></i>
                     <p style="color: var(--text-secondary); text-align: center;">
-                        No learning items for today. Add your first learning goal!
+                        No learning items. Add one to get started!
                     </p>
                 </div>
             `;
+            return;
+        }
+
+        if (this.learningModule) {
+            this.learningModule.render(todayItems);
             return;
         }
 
@@ -875,6 +893,14 @@ class SmartTodoApp {
     }
 
     renderProgress() {
+        const dailyData = [];
+        const categoryData = [];
+        const summary = { completed: this.todos.filter(t => t.completed).length, pending: this.todos.filter(t => !t.completed).length };
+        if (this.progressModule) {
+            this.progressModule.render(dailyData, categoryData, summary);
+            return;
+        }
+
         this.updateWeekDisplay();
         this.renderDailyChart();
         this.renderCategoryChart();
