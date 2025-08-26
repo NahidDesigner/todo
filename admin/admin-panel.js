@@ -169,28 +169,43 @@ class AdminPanel {
 			list.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">No assigned tasks</p>';
 			return;
 		}
-		list.innerHTML = this.assignedTasks.map(task => {
-			const assignedUser = task.assignedTo 
-				? this.users.find(u => u.uid === task.assignedTo)
-				: this.users.find(u => u.id === task.assignedProfileId);
-			return `
-				<div class="assigned-task-item" data-id="${task.id}">
-					<div class="assigned-task-header">
-						<div class="assigned-task-title">${task.title}</div>
-						<span class="todo-priority ${task.priority}">${task.priority}</span>
-					</div>
-					<div class="assigned-task-meta">
-						<span>Assigned to: ${assignedUser ? (assignedUser.name || assignedUser.email || 'Unnamed') : 'Unknown'}</span>
-						${task.dueDate ? `<span>Due: ${this.app.formatDate(task.dueDate)}</span>` : ''}
-						<span>Status: ${task.completed ? 'Completed' : 'Pending'}</span>
-					</div>
-					${task.description ? `<div class="assigned-task-description">${task.description}</div>` : ''}
-					<div class="assigned-task-actions">
-						<button class="btn-secondary" onclick="adminPanel.editAssignedTask('${task.id}')">Edit</button>
-					</div>
-				</div>
-			`;
-		}).join('');
+		const active = this.assignedTasks.filter(t => !t.completed);
+		const completed = this.assignedTasks.filter(t => t.completed);
+		const highPriority = active.filter(t => (t.priority || 'medium') === 'high');
+		const renderSection = (title, items) => `
+			<div class="admin-section-block">
+				<h4 style="margin: 0.5rem 0 0.75rem 0;">${title} (${items.length})</h4>
+				${items.length === 0 ? '<p style="color: var(--text-secondary);">None</p>' : items.map(task => {
+					const assignedUser = task.assignedTo 
+						? this.users.find(u => u.uid === task.assignedTo)
+						: this.users.find(u => u.id === task.assignedProfileId);
+					return `
+						<div class="assigned-task-item" data-id="${task.id}">
+							<div class="assigned-task-header">
+								<div class="assigned-task-title">${task.title}</div>
+								<span class="todo-priority ${task.priority}">${task.priority}</span>
+							</div>
+							<div class="assigned-task-meta">
+								<span>Assigned to: ${assignedUser ? (assignedUser.name || assignedUser.email || 'Unnamed') : 'Unknown'}</span>
+								${task.dueDate ? `<span>Due: ${this.app.formatDate(task.dueDate)}</span>` : ''}
+								<span>Status: ${task.completed ? 'Completed' : 'Pending'}</span>
+							</div>
+							${task.description ? `<div class="assigned-task-description">${task.description}</div>` : ''}
+							<div class="assigned-task-actions" style="display:flex; gap: 0.5rem;">
+								<button class="btn-secondary" onclick="adminPanel.editAssignedTask('${task.id}')">Edit</button>
+								<button class="btn-secondary" onclick="adminPanel.toggleAssignedCompleted('${task.id}', ${!task.completed})">${task.completed ? 'Mark Pending' : 'Mark Completed'}</button>
+								<button class="btn-secondary" onclick="adminPanel.deleteAssignedTask('${task.id}')">Delete</button>
+							</div>
+						</div>
+					`;
+				}).join('')}
+			</div>
+		`;
+		list.innerHTML = [
+			renderSection('High Priority', highPriority),
+			renderSection('Active Tasks', active),
+			renderSection('Completed Tasks', completed)
+		].join('');
 	}
 
 	async editAssignedTask(taskId) {

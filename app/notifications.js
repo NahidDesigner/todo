@@ -4,6 +4,8 @@ class NotificationsManager {
 	constructor(app) {
 		this.app = app;
 		this.unsubscribe = null;
+		this.prevUnread = 0;
+		this.audio = new Audio('https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg');
 	}
 
 	subscribe() {
@@ -24,6 +26,11 @@ class NotificationsManager {
 		const count = document.getElementById('notification-count');
 		if (!list || !count) return;
 		const unread = notifications.filter(n => !n.read).length;
+		// Play sound if unread increased
+		if (unread > this.prevUnread) {
+			try { this.audio.currentTime = 0; this.audio.play().catch(()=>{}); } catch(_) {}
+		}
+		this.prevUnread = unread;
 		count.textContent = unread;
 		if (unread > 0) {
 			document.getElementById('notifications-dropdown').style.display = 'block';
