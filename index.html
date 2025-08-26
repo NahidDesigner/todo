@@ -293,22 +293,22 @@
             <form id="user-form">
                 <div class="form-group">
                     <label for="user-email">Email</label>
-                    <input type="email" id="user-email" required>
+                    <input type="email" id="user-email" name="user-email" required>
                 </div>
                 <div class="form-group">
                     <label for="user-name">Full Name</label>
-                    <input type="text" id="user-name" required>
+                    <input type="text" id="user-name" name="user-name" required>
                 </div>
                 <div class="form-group">
                     <label for="user-role">Role</label>
-                    <select id="user-role" required>
+                    <select id="user-role" name="user-role" required>
                         <option value="user">User</option>
                         <option value="admin">Admin</option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label for="user-department">Department</label>
-                    <input type="text" id="user-department" placeholder="e.g., Development, Marketing">
+                    <input type="text" id="user-department" name="user-department" placeholder="e.g., Development, Marketing">
                 </div>
                 <div class="form-actions">
                     <button type="button" class="btn-secondary" id="cancel-user">Cancel</button>
@@ -330,22 +330,22 @@
             <form id="assign-task-form">
                 <div class="form-group">
                     <label for="assign-task-title">Task Title</label>
-                    <input type="text" id="assign-task-title" required>
+                    <input type="text" id="assign-task-title" name="assign-task-title" required>
                 </div>
                 <div class="form-group">
                     <label for="assign-task-description">Description</label>
-                    <textarea id="assign-task-description" rows="3"></textarea>
+                    <textarea id="assign-task-description" name="assign-task-description" rows="3"></textarea>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
                         <label for="assign-task-user">Assign To</label>
-                        <select id="assign-task-user" required>
+                        <select id="assign-task-user" name="assign-task-user" required>
                             <option value="">Select User</option>
                         </select>
                     </div>
                     <div class="form-group">
                         <label for="assign-task-priority">Priority</label>
-                        <select id="assign-task-priority">
+                        <select id="assign-task-priority" name="assign-task-priority">
                             <option value="low">Low</option>
                             <option value="medium" selected>Medium</option>
                             <option value="high">High</option>
@@ -355,11 +355,11 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="assign-task-due-date">Due Date</label>
-                        <input type="date" id="assign-task-due-date">
+                        <input type="date" id="assign-task-due-date" name="assign-task-due-date">
                     </div>
                     <div class="form-group">
                         <label for="assign-task-category">Category</label>
-                        <select id="assign-task-category">
+                        <select id="assign-task-category" name="assign-task-category">
                             <option value="general">General</option>
                             <option value="development">Development</option>
                             <option value="design">Design</option>
@@ -388,16 +388,16 @@
             <form id="todo-form">
                 <div class="form-group">
                     <label for="todo-title">Title</label>
-                    <input type="text" id="todo-title" required>
+                    <input type="text" id="todo-title" name="todo-title" required>
                 </div>
                 <div class="form-group">
                     <label for="todo-description">Description</label>
-                    <textarea id="todo-description" rows="3"></textarea>
+                    <textarea id="todo-description" name="todo-description" rows="3"></textarea>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
                         <label for="todo-priority">Priority</label>
-                        <select id="todo-priority">
+                        <select id="todo-priority" name="todo-priority">
                             <option value="low">Low</option>
                             <option value="medium" selected>Medium</option>
                             <option value="high">High</option>
@@ -405,7 +405,7 @@
                     </div>
                     <div class="form-group">
                         <label for="todo-due-date">Due Date</label>
-                        <input type="date" id="todo-due-date">
+                        <input type="date" id="todo-due-date" name="todo-due-date">
                     </div>
                 </div>
                 <div class="form-actions">
@@ -427,11 +427,11 @@
             <form id="learning-form">
                 <div class="form-group">
                     <label for="learning-title">Learning Topic</label>
-                    <input type="text" id="learning-title" required>
+                    <input type="text" id="learning-title" name="learning-title" required>
                 </div>
                 <div class="form-group">
                     <label for="learning-category">Category</label>
-                    <select id="learning-category">
+                    <select id="learning-category" name="learning-category">
                         <option value="programming">Programming</option>
                         <option value="design">Design</option>
                         <option value="business">Business</option>
@@ -441,7 +441,7 @@
                 </div>
                 <div class="form-group">
                     <label for="learning-notes">Notes/Comments</label>
-                    <textarea id="learning-notes" rows="4" placeholder="Add your learning notes, resources, or comments..."></textarea>
+                    <textarea id="learning-notes" name="learning-notes" rows="4" placeholder="Add your learning notes, resources, or comments..."></textarea>
                 </div>
                 <div class="form-actions">
                     <button type="button" class="btn-secondary" id="cancel-learning">Cancel</button>
