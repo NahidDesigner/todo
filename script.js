@@ -11,6 +11,12 @@ class SmartTodoApp {
         this.currentUser = null;
         this.isOnline = navigator.onLine;
         
+        // Modules
+        this.notificationsManager = null;
+        this.todosModule = null;
+        this.learningModule = null;
+        this.progressModule = null;
+        
         this.init();
     }
 
@@ -20,12 +26,18 @@ class SmartTodoApp {
         this.setupFirebaseAuth();
         this.setupOnlineStatus();
         this.setupSampleData();
+        
+        // Initialize modules
+        if (window.NotificationsManager) this.notificationsManager = new window.NotificationsManager(this);
+        if (window.TodosModule) this.todosModule = new window.TodosModule(this);
+        if (window.LearningModule) this.learningModule = new window.LearningModule(this);
+        if (window.ProgressModule) this.progressModule = new window.ProgressModule(this);
     }
 
     setupEventListeners() {
         // Tab navigation
         document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => this.switchTab(e.target.dataset.tab));
+            btn.addEventListener('click', (e) => this.switchTab(e.currentTarget.dataset.tab));
         });
 
         // Auth events
@@ -90,6 +102,12 @@ class SmartTodoApp {
                 await this.loadUserData();
                 this.setupRealtimeListeners();
                 await this.checkAndSetupAdmin(); // Add this line
+
+                // Notifications subscription via NotificationsManager
+                this.notificationsManager?.subscribe();
+                // Show notifications UI for all signed-in users
+                const notificationsDropdown = document.getElementById('notifications-dropdown');
+                if (notificationsDropdown) notificationsDropdown.style.display = 'block';
             } else {
                 console.log('User signed out');
                 this.todos = [];
@@ -143,7 +161,7 @@ class SmartTodoApp {
 
     // Show admin panel
     showAdminPanel() {
-        const adminTab = document.getElementById('admin-tab');
+        const adminTab = document.getElementById('admin-tab-btn');
         const adminToggle = document.getElementById('admin-toggle');
         const notificationsDropdown = document.getElementById('notifications-dropdown');
         const assignedFilter = document.querySelector('[data-filter="assigned"]');
@@ -166,6 +184,16 @@ class SmartTodoApp {
         if (assignedTasksBtn) {
             assignedTasksBtn.style.display = 'block';
         }
+
+        // Initialize AdminPanel once and expose globally
+        if (!window.adminPanel && window.AdminPanel) {
+            window.adminPanel = new window.AdminPanel(this);
+            // Initial load for notifications after admin panel constructed
+            window.adminPanel.loadNotifications?.();
+            window.adminPanel.updateAdminUI?.();
+        }
+        // Keep notifications live
+        window.adminPanel?.subscribeNotifications?.();
     }
 
     updateAuthUI() {
@@ -305,44 +333,52 @@ class SmartTodoApp {
     setupRealtimeListeners() {
         if (!this.currentUser) return;
         
-        // Real-time todos listener
+        // Real-time todos listener (assign full array to avoid duplicates)
         db.collection('users').doc(this.currentUser.uid)
             .collection('todos')
-            .onSnapshot((snapshot) => {
-                snapshot.docChanges().forEach((change) => {
-                    if (change.type === 'added' || change.type === 'modified') {
-                        const todo = { id: change.doc.id, ...change.doc.data() };
-                        const index = this.todos.findIndex(t => t.id === todo.id);
-                        if (index !== -1) {
-                            this.todos[index] = todo;
-                        } else {
-                            this.todos.push(todo);
+            .onSnapshot(async (snapshot) => {
+                const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                // Deduplicate by id
+                const idMap = new Map();
+                list.forEach(t => idMap.set(t.id, t));
+                let deduped = Array.from(idMap.values());
+                // Further deduplicate by assignedTaskId, prefer record where id === assignedTaskId
+                const groups = new Map();
+                for (const t of deduped) {
+                    const key = t.assignedTaskId || null;
+                    if (!key) continue;
+                    if (!groups.has(key)) groups.set(key, []);
+                    groups.get(key).push(t);
+                }
+                const toKeepIds = new Set(deduped.map(t => t.id));
+                const toDeleteIds = [];
+                groups.forEach((items, key) => {
+                    if (items.length <= 1) return;
+                    const preferred = items.find(it => it.id === key) || items[0];
+                    items.forEach(it => {
+                        if (it.id !== preferred.id) {
+                            toDeleteIds.push(it.id);
+                            toKeepIds.delete(it.id);
                         }
-                    } else if (change.type === 'removed') {
-                        this.todos = this.todos.filter(t => t.id !== change.doc.id);
-                    }
+                    });
                 });
+                // Apply dedup result locally
+                deduped = deduped.filter(t => toKeepIds.has(t.id));
+                this.todos = deduped;
                 this.renderTodos();
                 this.updateStats();
+                // Cleanup duplicates in Firestore (best-effort)
+                try {
+                    await Promise.all(toDeleteIds.map(dupId => db.collection('users').doc(this.currentUser.uid)
+                        .collection('todos').doc(dupId).delete().catch(() => {})));
+                } catch (_) {}
             });
         
-        // Real-time learning listener
+        // Real-time learning listener (assign full array)
         db.collection('users').doc(this.currentUser.uid)
             .collection('learning')
             .onSnapshot((snapshot) => {
-                snapshot.docChanges().forEach((change) => {
-                    if (change.type === 'added' || change.type === 'modified') {
-                        const learning = { id: change.doc.id, ...change.doc.data() };
-                        const index = this.learningItems.findIndex(l => l.id === learning.id);
-                        if (index !== -1) {
-                            this.learningItems[index] = learning;
-                        } else {
-                            this.learningItems.push(learning);
-                        }
-                    } else if (change.type === 'removed') {
-                        this.learningItems = this.learningItems.filter(l => l.id !== change.doc.id);
-                    }
-                });
+                this.learningItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 this.renderLearningItems();
                 this.updateStats();
             });
@@ -405,14 +441,27 @@ class SmartTodoApp {
             return;
         }
         
+        // Prevent deleting assigned tasks by users
+        const target = this.todos.find(t => t.id === todoId);
+        if (target && (target.assignedBy || target.assignedTo || target.assignedTaskId)) {
+            this.showNotification('Assigned tasks can only be deleted by admin.', 'warning');
+            return;
+        }
+        
+        // Optimistic UI update
+        const previousTodos = [...this.todos];
+        this.todos = this.todos.filter(t => t.id !== todoId);
+        this.renderTodos();
+        this.updateStats();
+        
         try {
             await db.collection('users').doc(this.currentUser.uid)
                 .collection('todos').doc(todoId).delete();
         } catch (error) {
             console.error('Error deleting todo:', error);
-            this.showNotification('Error deleting from cloud. Using local storage.', 'warning');
-            this.todos = this.todos.filter(t => t.id !== todoId);
-            this.saveLocalTodos();
+            this.showNotification('Error deleting from cloud. Reverting change.', 'warning');
+            // Revert UI on failure
+            this.todos = previousTodos;
             this.renderTodos();
             this.updateStats();
         }
@@ -583,6 +632,11 @@ class SmartTodoApp {
         const todoList = document.getElementById('todo-list');
         const filteredTodos = this.getFilteredTodos();
         
+        if (this.todosModule) {
+            this.todosModule.render(filteredTodos, this.currentFilter);
+            return;
+        }
+
         if (filteredTodos.length === 0) {
             todoList.innerHTML = `
                 <div class="empty-state">
@@ -634,18 +688,16 @@ class SmartTodoApp {
             case 'priority':
                 filtered = this.todos.filter(todo => todo.priority === 'high' && !todo.completed);
                 break;
+            case 'assigned':
+                filtered = this.todos.filter(todo => !todo.completed && (!!todo.assignedTo && this.currentUser && todo.assignedTo === this.currentUser.uid));
+                break;
         }
         
         return filtered.sort((a, b) => {
-            // Sort by priority first, then by creation date
-            const priorityOrder = { high: 3, medium: 2, low: 1 };
-            const aPriority = priorityOrder[a.priority] || 1;
-            const bPriority = priorityOrder[b.priority] || 1;
-            
-            if (aPriority !== bPriority) {
-                return bPriority - aPriority;
-            }
-            
+            // Sort by due date ascending (empty due dates last), then by creation date desc
+            const aDue = a.dueDate ? new Date(a.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
+            const bDue = b.dueDate ? new Date(b.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
+            if (aDue !== bDue) return aDue - bDue;
             return new Date(b.createdAt) - new Date(a.createdAt);
         });
     }
@@ -674,6 +726,54 @@ class SmartTodoApp {
             await this.saveTodo(todo);
             this.renderTodos();
             this.updateStats();
+
+            // Sync assignedTasks collection if this is an assigned task
+            if (todo.id && (todo.assignedBy || todo.assignedTo)) {
+                try {
+                    await db.collection('assignedTasks').doc(todo.id).set({
+                        completed: !!todo.completed,
+                        completedAt: todo.completed ? todo.completedAt : null
+                    }, { merge: true });
+                } catch (err) {
+                    console.error('Error syncing assignedTasks on toggle:', err);
+                }
+            }
+
+            // If this was an assigned task, notify admin and log activity on completion
+            if (todo.assignedBy && todo.assignedTo) {
+                try {
+                    if (todo.completed) {
+                        await db.collection('notifications').add({
+                            userId: todo.assignedBy,
+                            title: 'Task Completed',
+                            message: `Assigned task completed: ${todo.title}`,
+                            type: 'task_completed',
+                            taskId: todo.id,
+                            createdAt: new Date().toISOString(),
+                            read: false
+                        });
+                        await db.collection('teamActivity').add({
+                            type: 'task_completed',
+                            message: `${this.currentUser?.email || 'User'} completed "${todo.title}"`,
+                            taskId: todo.id,
+                            userId: this.currentUser?.uid,
+                            createdAt: new Date().toISOString()
+                        });
+                    } else {
+                        await db.collection('notifications').add({
+                            userId: todo.assignedBy,
+                            title: 'Task Reopened',
+                            message: `Assigned task reopened: ${todo.title}`,
+                            type: 'task_reopened',
+                            taskId: todo.id,
+                            createdAt: new Date().toISOString(),
+                            read: false
+                        });
+                    }
+                } catch (error) {
+                    console.error('Error creating status notifications/activity:', error);
+                }
+            }
         }
     }
 
@@ -771,12 +871,17 @@ class SmartTodoApp {
         if (todayItems.length === 0) {
             learningList.innerHTML = `
                 <div class="empty-state">
-                    <i class="fas fa-graduation-cap" style="font-size: 3rem; color: var(--text-muted); margin-bottom: 1rem;"></i>
+                    <i class="fas fa-book-open" style="font-size: 3rem; color: var(--text-muted); margin-bottom: 1rem;"></i>
                     <p style="color: var(--text-secondary); text-align: center;">
-                        No learning items for today. Add your first learning goal!
+                        No learning items. Add one to get started!
                     </p>
                 </div>
             `;
+            return;
+        }
+
+        if (this.learningModule) {
+            this.learningModule.render(todayItems);
             return;
         }
 
@@ -820,6 +925,14 @@ class SmartTodoApp {
     }
 
     renderProgress() {
+        const dailyData = [];
+        const categoryData = [];
+        const summary = { completed: this.todos.filter(t => t.completed).length, pending: this.todos.filter(t => !t.completed).length };
+        if (this.progressModule) {
+            this.progressModule.render(dailyData, categoryData, summary);
+            return;
+        }
+
         this.updateWeekDisplay();
         this.renderDailyChart();
         this.renderCategoryChart();

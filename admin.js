@@ -47,7 +47,7 @@ class AdminPanel {
 
     // Admin Panel Toggle
     toggleAdminPanel() {
-        const adminTab = document.getElementById('admin-tab');
+        const adminTab = document.getElementById('admin-tab-btn');
         if (adminTab) {
             this.app.switchTab('admin');
         }
@@ -169,6 +169,16 @@ class AdminPanel {
                 message: `You have been assigned: ${taskData.title}`,
                 type: 'task_assigned',
                 taskId: docRef.id,
+                createdAt: new Date().toISOString(),
+                read: false
+            });
+
+            // Log team activity
+            await db.collection('teamActivity').add({
+                type: 'task_assigned',
+                message: `${this.app.currentUser?.email || 'Admin'} assigned "${taskData.title}"`,
+                taskId: docRef.id,
+                userId: taskData.assignedTo,
                 createdAt: new Date().toISOString()
             });
 
@@ -214,6 +224,26 @@ class AdminPanel {
         } catch (error) {
             console.error('Error loading notifications:', error);
         }
+    }
+
+    subscribeNotifications() {
+        if (!this.app.currentUser) return;
+        
+        // Unsubscribe previous listener if any
+        if (this.notificationsUnsub) {
+            try { this.notificationsUnsub(); } catch (_) {}
+        }
+        
+        this.notificationsUnsub = db.collection('notifications')
+            .where('userId', '==', this.app.currentUser.uid)
+            .orderBy('createdAt', 'desc')
+            .limit(10)
+            .onSnapshot((snapshot) => {
+                this.notifications = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                this.renderNotifications();
+            }, (error) => {
+                console.error('Error subscribing to notifications:', error);
+            });
     }
 
     renderNotifications() {
@@ -463,7 +493,7 @@ class AdminPanel {
         const isAdmin = this.checkAdminStatus();
         
         // Show/hide admin tab
-        const adminTab = document.getElementById('admin-tab');
+        const adminTab = document.getElementById('admin-tab-btn');
         if (adminTab) {
             adminTab.style.display = isAdmin ? 'block' : 'none';
         }

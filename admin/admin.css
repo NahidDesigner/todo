@@ -1,0 +1,16 @@
+/* Admin-specific styles (kept minimal; rely on base styles) */
+
+.admin-panel h3 {
+	margin-bottom: 0.75rem;
+}
+
+.user-item,
+.assigned-task-item,
+.activity-item {
+	animation: fadeIn 0.2s ease-in;
+}
+
+@keyframes fadeIn {
+	from { opacity: 0; transform: translateY(4px); }
+	to { opacity: 1; transform: translateY(0); }
+}
