@@ -1,0 +1,124 @@
+// Admin Services - Firestore operations and subscriptions
+
+class AdminServices {
+	constructor(app) {
+		this.app = app;
+		this.notificationsUnsub = null;
+	}
+
+	// Users
+	async loadUsers() {
+		const snapshot = await db.collection('users').get();
+		return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+	}
+
+	async addUserProfile(userData) {
+		// Client apps cannot create Firebase Auth users for others.
+		// We only create a profile document; assignment will only list users with a valid uid.
+		const docRef = await db.collection('users').add({
+			...userData,
+			createdAt: new Date().toISOString(),
+			status: 'invited',
+			uid: userData.uid || null
+		});
+		return docRef.id;
+	}
+
+	async deleteUser(userId) {
+		await db.collection('users').doc(userId).delete();
+	}
+
+	// Assigned tasks
+	async loadAssignedTasks(limit = 20) {
+		const snapshot = await db.collection('assignedTasks')
+			.orderBy('createdAt', 'desc')
+			.limit(limit)
+			.get();
+		return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+	}
+
+	async assignTask(taskData) {
+		// Persist assigned task
+		const docRef = await db.collection('assignedTasks').add(taskData);
+		const taskId = docRef.id;
+		// Add into user's todos subcollection
+		await db.collection('users').doc(taskData.assignedTo)
+			.collection('todos').doc(taskId).set({ ...taskData, id: taskId });
+		// Notify assignee
+		await this.createNotification({
+			userId: taskData.assignedTo,
+			title: 'New Task Assigned',
+			message: `You have been assigned: ${taskData.title}`,
+			type: 'task_assigned',
+			taskId: taskId,
+			createdAt: new Date().toISOString(),
+			read: false
+		});
+		// Team activity
+		await db.collection('teamActivity').add({
+			type: 'task_assigned',
+			message: `${this.app.currentUser?.email || 'Admin'} assigned "${taskData.title}"`,
+			taskId: taskId,
+			userId: taskData.assignedTo,
+			createdAt: new Date().toISOString()
+		});
+		return taskId;
+	}
+
+	// Team activity
+	async loadTeamActivity(limit = 20) {
+		const snapshot = await db.collection('teamActivity')
+			.orderBy('createdAt', 'desc')
+			.limit(limit)
+			.get();
+		return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+	}
+
+	async loadAdminStats() {
+		const [usersSnapshot, tasksSnapshot, completedTasksSnapshot] = await Promise.all([
+			db.collection('users').get(),
+			db.collection('assignedTasks').where('completed', '==', false).get(),
+			db.collection('assignedTasks').where('completed', '==', true).get()
+		]);
+		return {
+			totalUsers: usersSnapshot.size,
+			activeTasks: tasksSnapshot.size,
+			completedTasks: completedTasksSnapshot.size,
+			pendingTasks: tasksSnapshot.size
+		};
+	}
+
+	// Notifications
+	async createNotification(notificationData) {
+		await db.collection('notifications').add(notificationData);
+	}
+
+	async loadNotificationsFor(userId, limit = 10) {
+		const snapshot = await db.collection('notifications')
+			.where('userId', '==', userId)
+			.orderBy('createdAt', 'desc')
+			.limit(limit)
+			.get();
+		return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+	}
+
+	subscribeNotifications(userId, onUpdate, limit = 10) {
+		if (!userId) return () => {};
+		if (this.notificationsUnsub) {
+			try { this.notificationsUnsub(); } catch (_) {}
+		}
+		this.notificationsUnsub = db.collection('notifications')
+			.where('userId', '==', userId)
+			.orderBy('createdAt', 'desc')
+			.limit(limit)
+			.onSnapshot((snapshot) => {
+				const notifications = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+				onUpdate(notifications);
+			}, (error) => {
+				console.error('Error subscribing to notifications:', error);
+			});
+		return this.notificationsUnsub;
+	}
+}
+
+window.AdminServices = AdminServices;

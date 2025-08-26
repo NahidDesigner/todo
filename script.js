@@ -425,14 +425,20 @@ class SmartTodoApp {
             return;
         }
         
+        // Optimistic UI update
+        const previousTodos = [...this.todos];
+        this.todos = this.todos.filter(t => t.id !== todoId);
+        this.renderTodos();
+        this.updateStats();
+        
         try {
             await db.collection('users').doc(this.currentUser.uid)
                 .collection('todos').doc(todoId).delete();
         } catch (error) {
             console.error('Error deleting todo:', error);
-            this.showNotification('Error deleting from cloud. Using local storage.', 'warning');
-            this.todos = this.todos.filter(t => t.id !== todoId);
-            this.saveLocalTodos();
+            this.showNotification('Error deleting from cloud. Reverting change.', 'warning');
+            // Revert UI on failure
+            this.todos = previousTodos;
             this.renderTodos();
             this.updateStats();
         }
