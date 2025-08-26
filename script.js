@@ -90,6 +90,16 @@ class SmartTodoApp {
                 await this.loadUserData();
                 this.setupRealtimeListeners();
                 await this.checkAndSetupAdmin(); // Add this line
+
+                // Ensure AdminPanel exists for all users to power notifications
+                if (!window.adminPanel && window.AdminPanel) {
+                    window.adminPanel = new window.AdminPanel(this);
+                }
+                // Subscribe notifications for signed-in user
+                window.adminPanel?.subscribeNotifications?.();
+                // Show notifications UI for all signed-in users
+                const notificationsDropdown = document.getElementById('notifications-dropdown');
+                if (notificationsDropdown) notificationsDropdown.style.display = 'block';
             } else {
                 console.log('User signed out');
                 this.todos = [];
@@ -174,6 +184,8 @@ class SmartTodoApp {
             window.adminPanel.loadNotifications?.();
             window.adminPanel.updateAdminUI?.();
         }
+        // Keep notifications live
+        window.adminPanel?.subscribeNotifications?.();
     }
 
     updateAuthUI() {
@@ -642,6 +654,9 @@ class SmartTodoApp {
             case 'priority':
                 filtered = this.todos.filter(todo => todo.priority === 'high' && !todo.completed);
                 break;
+            case 'assigned':
+                filtered = this.todos.filter(todo => !todo.completed && (!!todo.assignedTo && this.currentUser && todo.assignedTo === this.currentUser.uid));
+                break;
         }
         
         return filtered.sort((a, b) => {
@@ -682,6 +697,32 @@ class SmartTodoApp {
             await this.saveTodo(todo);
             this.renderTodos();
             this.updateStats();
+
+            // If this was an assigned task, notify admin and log activity on completion
+            if (todo.assignedBy && todo.assignedTo && todo.completed) {
+                try {
+                    // Notify the assigning admin
+                    await db.collection('notifications').add({
+                        userId: todo.assignedBy,
+                        title: 'Task Completed',
+                        message: `Assigned task completed: ${todo.title}`,
+                        type: 'task_completed',
+                        taskId: todo.id,
+                        createdAt: new Date().toISOString(),
+                        read: false
+                    });
+                    // Log team activity
+                    await db.collection('teamActivity').add({
+                        type: 'task_completed',
+                        message: `${this.currentUser?.email || 'User'} completed "${todo.title}"`,
+                        taskId: todo.id,
+                        userId: this.currentUser?.uid,
+                        createdAt: new Date().toISOString()
+                    });
+                } catch (error) {
+                    console.error('Error creating completion notifications/activity:', error);
+                }
+            }
         }
     }
 
