@@ -76,6 +76,56 @@ class AdminServices {
 		return taskId;
 	}
 
+	async updateAssignedTask(taskId, update) {
+		// Update assigned task doc
+		await db.collection('assignedTasks').doc(taskId).set(update, { merge: true });
+		// If assigned to a user account, upsert into user's todos and dedupe old entries
+		if (update.assignedTo) {
+			const userTodos = db.collection('users').doc(update.assignedTo).collection('todos');
+			await userTodos.doc(taskId).set({ ...update, id: taskId, assignedTaskId: taskId }, { merge: true });
+			// Delete any duplicate todos with same assignedTaskId but different id
+			const dupSnap = await userTodos.where('assignedTaskId', '==', taskId).get();
+			for (const d of dupSnap.docs) {
+				if (d.id !== taskId) {
+					try { await userTodos.doc(d.id).delete(); } catch (_) {}
+				}
+			}
+			// Notify assignee
+			await db.collection('notifications').add({
+				userId: update.assignedTo,
+				title: 'Assigned Task Updated',
+				message: `${update.title || 'Task'} was updated by admin`,
+				type: 'task_updated',
+				taskId: taskId,
+				createdAt: new Date().toISOString(),
+				read: false
+			});
+		}
+	}
+
+	async deleteAssignedTask(task) {
+		const taskId = task.id;
+		await db.collection('assignedTasks').doc(taskId).delete();
+		if (task.assignedTo) {
+			const userTodos = db.collection('users').doc(task.assignedTo).collection('todos');
+			try { await userTodos.doc(taskId).delete(); } catch (_) {}
+			// Delete any duplicates by assignedTaskId
+			const dupSnap = await userTodos.where('assignedTaskId', '==', taskId).get();
+			for (const d of dupSnap.docs) {
+				try { await userTodos.doc(d.id).delete(); } catch (_) {}
+			}
+			await db.collection('notifications').add({
+				userId: task.assignedTo,
+				title: 'Assigned Task Removed',
+				message: `${task.title || 'Task'} was removed by admin`,
+				type: 'task_removed',
+				taskId: taskId,
+				createdAt: new Date().toISOString(),
+				read: false
+			});
+		}
+	}
+
 	// Team activity
 	async loadTeamActivity(limit = 20) {
 		const snapshot = await db.collection('teamActivity')

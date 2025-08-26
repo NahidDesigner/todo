@@ -185,21 +185,7 @@ class AdminPanel {
 			completed: false
 		};
 		if (this.editTaskId) {
-			const taskId = this.editTaskId;
-			await db.collection('assignedTasks').doc(taskId).set(update, { merge: true });
-			if (assignedTo) {
-				await db.collection('users').doc(assignedTo)
-					.collection('todos').doc(taskId).set({ ...update, id: taskId, assignedTaskId: taskId }, { merge: true });
-				await db.collection('notifications').add({
-					userId: assignedTo,
-					title: 'Assigned Task Updated',
-					message: `${update.title} was updated by admin`,
-					type: 'task_updated',
-					taskId: taskId,
-					createdAt: new Date().toISOString(),
-					read: false
-				});
-			}
+			await this.services.updateAssignedTask(this.editTaskId, update);
 		} else {
 			await this.services.assignTask({ ...update, assignedBy: this.app.currentUser.uid });
 		}
@@ -288,6 +274,19 @@ class AdminPanel {
 			});
 		}
 		await this.loadAssignedTasks();
+	}
+
+	async deleteAssignedTask(taskId) {
+		const task = this.assignedTasks.find(t => t.id === taskId);
+		if (!task) return;
+		try {
+			await this.services.deleteAssignedTask(task);
+			await this.loadAssignedTasks();
+			this.app.showNotification('Assigned task deleted.', 'success');
+		} catch (e) {
+			console.error('Delete assigned task failed:', e);
+			this.app.showNotification('Failed to delete assigned task', 'error');
+		}
 	}
 
 	async loadTeamActivity() {
